@@ -32,7 +32,8 @@ class SdsResult {
 
 class SdsException implements Exception {
   final String message;
-  SdsException(this.message);
+  final bool isQuotaExceeded;
+  SdsException(this.message, {this.isQuotaExceeded = false});
 }
 
 /// Calls the findSds Cloud Function - either with a text query, or with a
@@ -60,7 +61,9 @@ class SdsRepository {
       return SdsResult.fromMap(Map<String, dynamic>.from(result.data as Map));
     } on FirebaseFunctionsException catch (e) {
       throw SdsException(
-          e.message ?? 'Something went wrong searching for the SDS.');
+        e.message ?? 'Something went wrong searching for the SDS.',
+        isQuotaExceeded: e.code == 'resource-exhausted',
+      );
     }
   }
 
@@ -83,7 +86,9 @@ class SdsRepository {
       return SdsResult.fromMap(Map<String, dynamic>.from(result.data as Map));
     } on FirebaseFunctionsException catch (e) {
       throw SdsException(
-          e.message ?? 'Something went wrong searching for the SDS.');
+        e.message ?? 'Something went wrong searching for the SDS.',
+        isQuotaExceeded: e.code == 'resource-exhausted',
+      );
     }
   }
 }

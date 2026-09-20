@@ -13,15 +13,12 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const _featureKey = 'chat';
-
   final List<ChatMessage> _messages = [];
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _sending = false;
-  bool _watchingAds = false;
-  String? _pendingReply;
   String? _error;
+  bool _errorIsQuota = false;
 
   static const _welcomeText =
       "Tell me about your business or the activities you are doing, and "
@@ -31,100 +28,52 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || _sending || _watchingAds || _pendingReply != null)
-      return;
+    if (text.isEmpty || _sending) return;
 
     setState(() {
       _messages.add(ChatMessage(role: 'user', content: text));
       _controller.clear();
       _sending = true;
       _error = null;
+      _errorIsQuota = false;
     });
     _scrollToBottom();
 
-    String reply;
-    try {
-      reply = await ChatRepository.instance.sendMessage(_messages);
-    } on ChatException catch (e) {
-      setState(() {
-        _error = e.message;
-        _sending = false;
-      });
-      _scrollToBottom();
-      return;
-    }
-    if (!mounted) return;
-    setState(() => _sending = false);
+    final isPro = SubscriptionRepository.instance.isPro;
 
-    if (SubscriptionRepository.instance.isPro) {
+    try {
+      final reply = await AdService.instance.runWithAd<String>(
+        isPro: isPro,
+        task: () => ChatRepository.instance.sendMessage(_messages),
+      );
+
+      if (!mounted) return;
+
+      if (reply == null) {
+        // Free user: ad wasn't watched through to completion.
+        setState(() {
+          _sending = false;
+          _error =
+              "You'll need to watch the ad through to the end to get your answer. Please try again.";
+        });
+        _scrollToBottom();
+        return;
+      }
+
       setState(() {
+        _sending = false;
         _messages.add(ChatMessage(role: 'assistant', content: reply));
       });
       _scrollToBottom();
-      return;
-    }
-
-    setState(() => _pendingReply = reply);
-    _scrollToBottom();
-    await _tryRevealAnswer();
-  }
-
-  Future<void> _tryRevealAnswer() async {
-    if (_pendingReply == null || _watchingAds) return;
-
-    final adCount = await AdService.instance.nextRequiredAdCount(_featureKey);
-    if (!mounted) return;
-    final confirmed = await _confirmWatchAds(adCount);
-    if (confirmed != true) return;
-
-    setState(() {
-      _watchingAds = true;
-      _error = null;
-    });
-    final earned = await AdService.instance.watchAds(adCount);
-    if (!mounted) return;
-    setState(() => _watchingAds = false);
-
-    if (!earned) {
+    } on ChatException catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = adCount == 1
-            ? "You need to watch the ad through to the end to reveal the answer. Please try again."
-            : "You need to watch all $adCount ads through to the end to reveal the answer. Please try again.";
+        _sending = false;
+        _error = e.message;
+        _errorIsQuota = e.isQuotaExceeded;
       });
-      return;
+      _scrollToBottom();
     }
-    await AdService.instance.recordUnlockedRequest(_featureKey);
-    if (!mounted) return;
-
-    setState(() {
-      _messages.add(ChatMessage(role: 'assistant', content: _pendingReply!));
-      _pendingReply = null;
-    });
-    _scrollToBottom();
-  }
-
-  Future<bool?> _confirmWatchAds(int adCount) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Watch an ad to continue'),
-        content: Text(
-          adCount == 1
-              ? 'Watch a short ad to reveal the answer.'
-              : 'Watch $adCount ads back-to-back to reveal the answer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Watch'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _scrollToBottom() {
@@ -165,24 +114,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length +
-                          (_sending ? 1 : 0) +
-                          (_pendingReply != null ? 1 : 0),
+                      itemCount: _messages.length + (_sending ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (index < _messages.length) {
                           return _MessageBubble(message: _messages[index]);
                         }
-                        final extra = index - _messages.length;
-                        if (_sending && extra == 0) {
-                          return const _TypingIndicator();
-                        }
-                        if (_pendingReply != null) {
-                          return _RevealAnswerCard(
-                            onTap: _tryRevealAnswer,
-                            watchingAds: _watchingAds,
-                          );
-                        }
-                        return const SizedBox.shrink();
+                        return const _TypingIndicator();
                       },
                     ),
             ),
@@ -191,13 +128,26 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: AppColors.red.withValues(alpha: 0.1),
+              color: (_errorIsQuota ? AppColors.amberDeep : AppColors.red)
+                  .withValues(alpha: 0.1),
               child: Row(
                 children: [
+                  Icon(
+                    _errorIsQuota
+                        ? Icons.hourglass_bottom
+                        : Icons.error_outline,
+                    size: 16,
+                    color: _errorIsQuota ? AppColors.amberDeep : AppColors.red,
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _error!,
-                      style: AppText.label(size: 12, color: AppColors.red),
+                      style: AppText.label(
+                        size: 12,
+                        color:
+                            _errorIsQuota ? AppColors.amberDeep : AppColors.red,
+                      ),
                     ),
                   ),
                 ],
@@ -206,8 +156,8 @@ class _ChatScreenState extends State<ChatScreen> {
           _InputBar(
             controller: _controller,
             onSend: _send,
-            enabled: !_sending && !_watchingAds && _pendingReply == null,
-            watchingAds: _watchingAds,
+            enabled: !_sending,
+            sending: _sending,
           ),
         ],
       ),
@@ -301,61 +251,17 @@ class _TypingIndicator extends StatelessWidget {
   }
 }
 
-class _RevealAnswerCard extends StatelessWidget {
-  final VoidCallback onTap;
-  final bool watchingAds;
-  const _RevealAnswerCard({required this.onTap, required this.watchingAds});
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: InkWell(
-        onTap: watchingAds ? null : onTap,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.paperRaised,
-            border: Border.all(color: AppColors.amberDeep),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              watchingAds
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(Icons.play_circle_outline,
-                      color: AppColors.amberDeep, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                watchingAds
-                    ? 'Watching ad...'
-                    : 'Watch an ad to reveal the answer',
-                style: AppText.label(size: 12, color: AppColors.ink),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _InputBar extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
   final bool enabled;
-  final bool watchingAds;
+  final bool sending;
 
   const _InputBar({
     required this.controller,
     required this.onSend,
     required this.enabled,
-    required this.watchingAds,
+    required this.sending,
   });
 
   @override
@@ -381,8 +287,8 @@ class _InputBar extends StatelessWidget {
               maxLines: 4,
               style: AppText.body(size: 14),
               decoration: InputDecoration(
-                hintText: watchingAds
-                    ? 'Watching ad...'
+                hintText: sending
+                    ? 'Getting your answer...'
                     : 'Describe your business or activities...',
                 hintStyle: AppText.body(size: 14, color: AppColors.steel),
                 filled: true,
@@ -406,7 +312,7 @@ class _InputBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          watchingAds
+          sending
               ? const Padding(
                   padding: EdgeInsets.all(8),
                   child: SizedBox(

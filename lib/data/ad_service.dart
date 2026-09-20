@@ -1,27 +1,21 @@
 import 'dart:async';
 
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Handles the ad-gated unlock system used across the app's ad-gated
-/// features (Chat Bot answers, Toolbox Talk "Open", SDS Finder searches,
-/// Certificate Reminders).
+/// features (Chat Bot answers, Toolbox Talk "Open"/"Save", SDS Finder
+/// searches, Certificate Reminders).
 ///
-/// Each feature is identified by a short [featureKey] (e.g. 'chat',
-/// 'toolbox_talk_open', 'sds_finder', 'certificates'). Every request
-/// requires watching exactly one rewarded ad to unlock - no escalation.
+/// Daily free/Pro usage caps for Chat Bot and SDS Finder are enforced
+/// server-side, in the Cloud Functions those features call - not here.
+/// This class's job is purely about the ad itself.
 class AdService {
   AdService._();
   static final AdService instance = AdService._();
 
-  // The real ad unit for the OSH Act App (AdMob console, "chat_unlock").
   static const String _rewardedAdUnitId =
       'ca-app-pub-5123635284859515/2402128555';
 
-  // Google's official test ad unit ID - always serves a real, safe test ad.
-  // Use this while developing so you never risk serving real ads to
-  // yourself, which can get an AdMob account flagged for invalid traffic.
-  // Swap _useTestAds to false before publishing to the Play Store.
   static const String _testRewardedAdUnitId =
       'ca-app-pub-3940256099942544/5224354917';
   static const bool _useTestAds = true;
@@ -33,27 +27,11 @@ class AdService {
     await MobileAds.instance.initialize();
   }
 
-  /// Always requires exactly one ad per request - no escalation.
   Future<int> nextRequiredAdCount(String featureKey) async {
     return 1;
   }
 
-  /// Call once the user has successfully watched the required ad(s) for
-  /// [featureKey], to record that this request is now unlocked.
-  Future<void> recordUnlockedRequest(String featureKey) async {
-    final prefs = await SharedPreferences.getInstance();
-    final today = _dateKey();
-    await prefs.setString('ads_${featureKey}_date', today);
-    await prefs.setInt(
-      'ads_${featureKey}_count',
-      (prefs.getInt('ads_${featureKey}_count') ?? 0) + 1,
-    );
-  }
-
-  String _dateKey() {
-    final now = DateTime.now();
-    return '${now.year}-${now.month}-${now.day}';
-  }
+  Future<void> recordUnlockedRequest(String featureKey) async {}
 
   Future<RewardedAd?> _loadAd() async {
     final completer = Completer<RewardedAd?>();
@@ -87,11 +65,6 @@ class AdService {
     return completer.future;
   }
 
-  /// Shows [count] rewarded ads back-to-back. Returns true only if the
-  /// user watched every single one through to completion and earned the
-  /// reward each time; false if any ad failed to load, or the user
-  /// dismissed one early without earning the reward - in which case no
-  /// request should be unlocked and the caller should not proceed.
   Future<bool> watchAds(int count) async {
     for (var i = 0; i < count; i++) {
       final ad = await _loadAd();
@@ -100,5 +73,42 @@ class AdService {
       if (!earned) return false;
     }
     return true;
+  }
+
+  Future<T?> runWithAd<T>({
+    required bool isPro,
+    required Future<T> Function() task,
+  }) async {
+    if (isPro) {
+      return task();
+    }
+
+    T? taskResult;
+    Object? taskError;
+    StackTrace? taskStack;
+    final taskFuture = task().then((v) {
+      taskResult = v;
+    }).catchError((Object e, StackTrace st) {
+      taskError = e;
+      taskStack = st;
+    });
+
+    final ad = await _loadAd();
+    if (ad == null) {
+      await taskFuture;
+      if (taskError != null) {
+        Error.throwWithStackTrace(taskError!, taskStack!);
+      }
+      return null;
+    }
+
+    final earned = await _showAd(ad);
+    await taskFuture;
+
+    if (taskError != null) {
+      Error.throwWithStackTrace(taskError!, taskStack!);
+    }
+    if (!earned) return null;
+    return taskResult;
   }
 }

@@ -9,6 +9,7 @@ import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import '../data/ad_service.dart';
 import '../data/connectivity_service.dart';
 import '../data/sds_repository.dart';
+import '../data/subscription_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_download_button.dart';
 
@@ -20,11 +21,11 @@ class SdsScreen extends StatefulWidget {
 }
 
 class _SdsScreenState extends State<SdsScreen> {
-  static const _featureKey = 'sds_finder';
   final _controller = TextEditingController();
   bool _searching = false;
   SdsResult? _result;
   String? _error;
+  bool _errorIsQuota = false;
 
   @override
   void dispose() {
@@ -32,48 +33,45 @@ class _SdsScreenState extends State<SdsScreen> {
     super.dispose();
   }
 
-  Future<bool?> _confirmWatchAds(int adCount) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Watch an ad to continue'),
-        content: Text(
-          adCount == 1
-              ? 'Watch a short ad to search for this SDS.'
-              : 'Watch $adCount ads back-to-back to search for this SDS.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Watch'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _runSearch(Future<SdsResult> Function() search) async {
+    final isPro = SubscriptionRepository.instance.isPro;
 
-  Future<bool> _unlockSearch() async {
-    final adCount = await AdService.instance.nextRequiredAdCount(_featureKey);
-    if (!mounted) return false;
-    final confirmed = await _confirmWatchAds(adCount);
-    if (confirmed != true) return false;
+    setState(() {
+      _searching = true;
+      _error = null;
+      _errorIsQuota = false;
+      _result = null;
+    });
 
-    final earned = await AdService.instance.watchAds(adCount);
-    if (!mounted) return false;
-    if (!earned) {
+    try {
+      final result = await AdService.instance.runWithAd<SdsResult>(
+        isPro: isPro,
+        task: search,
+      );
+
+      if (!mounted) return;
+
+      if (result == null) {
+        setState(() {
+          _searching = false;
+          _error =
+              "You'll need to watch the ad through to the end to see this result. Please try again.";
+        });
+        return;
+      }
+
       setState(() {
-        _error = adCount == 1
-            ? "You'll need to watch the ad through to the end to unlock this."
-            : "You'll need to watch all $adCount ads through to the end to unlock this.";
+        _searching = false;
+        _result = result;
       });
-      return false;
+    } on SdsException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _searching = false;
+        _error = e.message;
+        _errorIsQuota = e.isQuotaExceeded;
+      });
     }
-    await AdService.instance.recordUnlockedRequest(_featureKey);
-    return true;
   }
 
   Future<void> _searchByText() async {
@@ -89,22 +87,7 @@ class _SdsScreenState extends State<SdsScreen> {
       return;
     }
 
-    if (!await _unlockSearch()) return;
-    if (!mounted) return;
-
-    setState(() {
-      _searching = true;
-      _error = null;
-      _result = null;
-    });
-    try {
-      final result = await SdsRepository.instance.findByText(query);
-      setState(() => _result = result);
-    } on SdsException catch (e) {
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
+    await _runSearch(() => SdsRepository.instance.findByText(query));
   }
 
   Future<void> _searchByPhoto() async {
@@ -123,28 +106,15 @@ class _SdsScreenState extends State<SdsScreen> {
         await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
     if (photo == null) return;
 
-    if (!await _unlockSearch()) return;
-    if (!mounted) return;
-
-    setState(() {
-      _searching = true;
-      _error = null;
-      _result = null;
-    });
-    try {
+    await _runSearch(() async {
       final bytes = await File(photo.path).readAsBytes();
       final base64Image = base64Encode(bytes);
-      final result = await SdsRepository.instance.findByImage(
+      return SdsRepository.instance.findByImage(
         imageBase64: base64Image,
         imageMediaType: 'image/jpeg',
         query: _controller.text.trim().isEmpty ? null : _controller.text.trim(),
       );
-      setState(() => _result = result);
-    } on SdsException catch (e) {
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
+    });
   }
 
   Future<void> _saveSds() async {
@@ -273,9 +243,30 @@ class _SdsScreenState extends State<SdsScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
-                color: AppColors.red.withValues(alpha: 0.1),
-                child: Text(_error!,
-                    style: AppText.label(size: 12, color: AppColors.red)),
+                color: (_errorIsQuota ? AppColors.amberDeep : AppColors.red)
+                    .withValues(alpha: 0.1),
+                child: Row(
+                  children: [
+                    Icon(
+                      _errorIsQuota
+                          ? Icons.hourglass_bottom
+                          : Icons.error_outline,
+                      size: 16,
+                      color:
+                          _errorIsQuota ? AppColors.amberDeep : AppColors.red,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(_error!,
+                          style: AppText.label(
+                            size: 12,
+                            color: _errorIsQuota
+                                ? AppColors.amberDeep
+                                : AppColors.red,
+                          )),
+                    ),
+                  ],
+                ),
               ),
             if (_result != null) _buildResult(_result!),
           ],
