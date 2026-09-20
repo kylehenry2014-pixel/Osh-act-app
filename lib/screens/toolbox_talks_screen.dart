@@ -308,6 +308,7 @@ class _TalkDetailSheet extends StatelessWidget {
   const _TalkDetailSheet({required this.entry});
 
   static const _openFeatureKey = 'toolbox_talk_open';
+  static const _saveFeatureKey = 'toolbox_talk_save';
 
   Future<void> _openTalk(BuildContext context) async {
     if (!SubscriptionRepository.instance.isPro) {
@@ -367,6 +368,51 @@ class _TalkDetailSheet extends StatelessWidget {
 
   Future<void> _saveTalk(BuildContext context) async {
     try {
+      if (!SubscriptionRepository.instance.isPro) {
+        final adCount =
+            await AdService.instance.nextRequiredAdCount(_saveFeatureKey);
+        if (!context.mounted) return;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Watch an ad to continue'),
+            content: Text(
+              adCount == 1
+                  ? 'Watch a short ad to save this document.'
+                  : 'Watch $adCount ads back-to-back to save this document.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Watch'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
+        final earned = await AdService.instance.watchAds(adCount);
+        if (!context.mounted) return;
+        if (!earned) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                adCount == 1
+                    ? "You'll need to watch the ad through to the end to unlock this."
+                    : "You'll need to watch all $adCount ads through to the end to unlock this.",
+              ),
+            ),
+          );
+          return;
+        }
+        await AdService.instance.recordUnlockedRequest(_saveFeatureKey);
+        if (!context.mounted) return;
+      }
+
       final path = await _extractAssetToTemp(entry.assetPath, entry.fileName);
       await FlutterFileDialog.saveFile(
         params: SaveFileDialogParams(sourceFilePath: path),
