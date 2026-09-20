@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Privacy Policy - OHS Act & Regulations</title>
+<style>
+  :root{
+    --ink:#1B1E19; --paper:#EFE9D8; --paper-raised:#F7F3E6;
+    --amber:#DA9B2A; --amber-deep:#B87D1A; --steel:#48595D; --line:#1B1E1924;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:Georgia, 'Source Serif 4', serif; line-height:1.6;
+  }
+  .hazard-stripe{
+    height:9px;
+    background: repeating-linear-gradient(-45deg, var(--amber), var(--amber) 12px, var(--ink) 12px, var(--ink) 24px);
+  }
+  .wrap{ max-width:680px; margin:0 auto; padding:0 22px 60px; }
+  header{ padding:26px 0 16px; border-bottom:1px solid var(--ink)3a; }
+  .label{ font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; color:var(--steel); }
+  h1{ font-family:Georgia, serif; font-weight:700; font-size:26px; margin:10px 0 4px; }
+  .updated{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--steel); }
+  h2{ font-size:17px; margin-top:32px; border-left:3px solid var(--amber-deep); padding-left:10px; }
+  p, li{ font-size:15px; }
+  ul{ padding-left:20px; }
+  .note{
+    background:var(--paper-raised); border:1px solid var(--line); padding:14px 16px;
+    font-size:13px; color:var(--steel); margin:16px 0;
+  }
+  .contact-box{
+    background:var(--paper-raised); border:1.5px solid var(--ink); padding:20px; margin-top:16px;
+  }
+  textarea, input[type=text], input[type=email]{
+    width:100%; font-family:Georgia, serif; font-size:14px; padding:10px;
+    border:1.5px solid var(--ink); background:var(--paper-raised); margin-bottom:10px; box-sizing:border-box;
+  }
+  button{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em;
+    padding:12px 18px; border:1.5px solid var(--ink); background:var(--ink); color:var(--paper-raised);
+    cursor:pointer;
+  }
+  button:active{ background:var(--amber-deep); border-color:var(--amber-deep); }
+  #status{ font-family:'IBM Plex Mono', monospace; font-size:12px; margin-top:10px; }
+  #status.success{ color:var(--amber-deep); }
+  #status.error{ color:#A23B2E; }
+</style>
+</head>
+<body>
+<div class="hazard-stripe"></div>
+<div class="wrap">
+  <header>
+    <div class="label">OHS Act &amp; Regulations</div>
+    <h1>Privacy Policy</h1>
+    <div class="updated">Last updated: 18 August 2026</div>
+  </header>
+
+  <p>This policy explains what information the OHS Act &amp; Regulations app collects, how it is used, and how to reach us with questions. We have tried to write it in plain language rather than dense legal text.</p>
+
+  <h2>Summary</h2>
+  <p>The app does not require you to create an account, and it does not collect, store, or share your personal information on any server. Bookmarks, notes, and checklist progress you create in the app stay on your own device. The only information that ever leaves your device is what you choose to type into the optional bug report form.</p>
+
+  <h2>What the app stores on your device</h2>
+  <p>If you use the Bookmarks, Notes, or Checklist features, the app saves that information locally on your phone using standard device storage. This never leaves your device, is not visible to us, and is not sent to any server. If you uninstall the app, this information is deleted along with it.</p>
+
+  <h2>What happens when you submit a bug report</h2>
+  <p>The app includes an optional "Report a bug" form. If you choose to use it, the following is sent to Formspree, a third party form processing service, which forwards it to us by email:</p>
+  <ul>
+    <li>The description you typed into the form</li>
+    <li>The section of the app you were viewing at the time, if any</li>
+    <li>Basic technical information about your device or browser</li>
+  </ul>
+  <p>This information is used only to understand and fix the issue you reported. We do not use it for marketing, and we do not share it with anyone beyond what is needed to process the report.</p>
+
+  <h2>What the app does not do</h2>
+  <ul>
+    <li>No advertising and no ad tracking of any kind</li>
+    <li>No analytics or usage tracking</li>
+    <li>No sale or sharing of personal information for marketing purposes</li>
+    <li>No account or login is required to use the app</li>
+  </ul>
+
+  <h2>Children's privacy</h2>
+  <p>This app is a professional reference tool for occupational health and safety law and is not directed at children. We do not knowingly collect information from children.</p>
+
+  <h2>Future updates to this policy</h2>
+  <div class="note">
+    Planned features such as optional paid subscriptions and user accounts are not yet part of the app. When they are introduced, this policy will be updated in advance to describe exactly what additional information is involved, and the update will be clearly dated so you can see what has changed.
+  </div>
+
+  <h2>Changes to this policy</h2>
+  <p>If this policy changes, the updated version will be posted here with a new "last updated" date at the top of the page.</p>
+
+  <h2>Contact us</h2>
+  <p>If you have a question about this policy or about your information, use the form below rather than a public email address, so your message reaches us directly and privately.</p>
+
+  <div class="contact-box">
+    <input type="text" id="name" placeholder="Your name (optional)">
+    <input type="email" id="email" placeholder="Your email, so we can reply" required>
+    <textarea id="message" rows="4" placeholder="Your question..." required></textarea>
+    <button id="submitBtn" onclick="submitForm()">Send</button>
+    <div id="status"></div>
+  </div>
+</div>
+
+<script>
+async function submitForm(){
+  const name = document.getElementById('name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const message = document.getElementById('message').value.trim();
+  const status = document.getElementById('status');
+  const btn = document.getElementById('submitBtn');
+
+  if(!email || !message){
+    status.textContent = 'Please fill in your email and question.';
+    status.className = 'error';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Sending...';
+  status.className = '';
+
+  try{
+    const res = await fetch('https://formspree.io/f/mkjwqjze', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: new URLSearchParams({
+        name: name,
+        email: email,
+        message: message,
+        _subject: 'OHS Act App - Privacy Policy Question'
+      })
+    });
+    if(res.ok){
+      status.textContent = 'Thanks - your message has been sent.';
+      status.className = 'success';
+      document.getElementById('name').value = '';
+      document.getElementById('email').value = '';
+      document.getElementById('message').value = '';
+    } else {
+      status.textContent = 'Something went wrong. Please try again.';
+      status.className = 'error';
+    }
+  } catch(err){
+    status.textContent = 'Network error. Please try again.';
+    status.className = 'error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

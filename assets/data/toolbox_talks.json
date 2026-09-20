@@ -1,0 +1,352 @@
+[
+  {
+    "id": "tbt-1",
+    "num": "1",
+    "category": "General Workplace Safety",
+    "title": "Importance of Safety Training",
+    "content": "Explain why ongoing safety training matters, not just a once-off induction. Cover: the OHS Act requires employers to inform, instruct and train employees on hazards specific to their work (section 13). Discuss how untrained workers are far more likely to be involved in incidents. Ask the team when they last had refresher training and on what."
+  },
+  {
+    "id": "tbt-2",
+    "num": "2",
+    "category": "General Workplace Safety",
+    "title": "Housekeeping and Worksite Cleanliness",
+    "content": "Poor housekeeping causes slips, trips, falls, and fire hazards. Cover: keeping walkways clear, proper storage of tools and materials, immediate cleanup of spills, and correct waste disposal. A tidy site is a safer site - discuss what 'clean as you go' looks like on this job."
+  },
+  {
+    "id": "tbt-3",
+    "num": "3",
+    "category": "General Workplace Safety",
+    "title": "Proper Use of Personal Protective Equipment (PPE)",
+    "content": "PPE is the last line of defence, not the first. Cover: correct selection for the task, proper fit and inspection before use, when PPE must be replaced, and the employer's duty to provide it free of charge. Discuss any PPE issues the team has experienced (poor fit, damage, discomfort)."
+  },
+  {
+    "id": "tbt-4",
+    "num": "4",
+    "category": "General Workplace Safety",
+    "title": "Slips, Trips, and Falls Prevention",
+    "content": "The most common cause of workplace injury. Cover: uneven surfaces, trailing cables, wet floors, poor lighting, and inappropriate footwear. Walk the team through this site's specific trip hazards and how to report them."
+  },
+  {
+    "id": "tbt-5",
+    "num": "5",
+    "category": "General Workplace Safety",
+    "title": "Fire Safety and Extinguisher Use",
+    "content": "Cover: the fire triangle (heat, fuel, oxygen), types of fire extinguishers and which fire class each is for, the PASS technique (Pull, Aim, Squeeze, Sweep), and this site's evacuation routes and assembly point. Confirm everyone knows where the nearest extinguisher is."
+  },
+  {
+    "id": "tbt-6",
+    "num": "6",
+    "category": "General Workplace Safety",
+    "title": "Electrical Safety Basics",
+    "content": "Cover: never touching electrical equipment with wet hands, checking cables and plugs for damage before use, respecting isolation/lockout tags, and the danger of overloaded extension leads. Remind the team that electrical work is only for authorised, competent persons."
+  },
+  {
+    "id": "tbt-7",
+    "num": "7",
+    "category": "General Workplace Safety",
+    "title": "Hazard Communication (HazCom)",
+    "content": "Cover: reading Safety Data Sheets (SDS) before using any chemical, understanding GHS pictograms and hazard labels, and knowing where the site's SDS file is kept. Ask the team to name a hazard symbol they've seen recently and what it means."
+  },
+  {
+    "id": "tbt-8",
+    "num": "8",
+    "category": "General Workplace Safety",
+    "title": "Emergency Evacuation Procedures",
+    "content": "Cover: the alarm signal for this site, primary and secondary evacuation routes, the assembly point, and the role of fire marshals/wardens. Discuss what to do if a route is blocked, and confirm everyone knows who does headcounts."
+  },
+  {
+    "id": "tbt-9",
+    "num": "9",
+    "category": "General Workplace Safety",
+    "title": "First Aid and CPR Awareness",
+    "content": "Cover: who the site's trained first aiders are and where the first aid box is located, the basics of primary response (check, call, care), and when to call emergency services rather than attempt treatment. Encourage anyone interested in first aid certification to speak to their supervisor."
+  },
+  {
+    "id": "tbt-10",
+    "num": "10",
+    "category": "General Workplace Safety",
+    "title": "Reporting Near Misses and Incidents",
+    "content": "A near miss today can be tomorrow's serious injury if ignored. Cover: what counts as a reportable incident under the OHS Act (section 24), why near-miss reporting is protected and encouraged rather than punished, and how to submit a report on this site. Ask if anyone has had a close call recently that wasn't reported."
+  },
+  {
+    "id": "tbt-11",
+    "num": "11",
+    "category": "Equipment and Machinery Safety",
+    "title": "Hand Tool Safety",
+    "content": "Cover: inspecting tools before use, using the right tool for the job, keeping cutting edges sharp and guarded, and safe storage to prevent damage or injury. Discuss any tools on site that are due for replacement."
+  },
+  {
+    "id": "tbt-12",
+    "num": "12",
+    "category": "Equipment and Machinery Safety",
+    "title": "Power Tool Safety",
+    "content": "Cover: checking cords and guards before use, wearing appropriate PPE (eye/ear protection), keeping hands clear of moving parts, and never removing safety guards. Remind the team that only trained, authorised users should operate power tools."
+  },
+  {
+    "id": "tbt-13",
+    "num": "13",
+    "category": "Equipment and Machinery Safety",
+    "title": "Heavy Equipment Operation",
+    "content": "Cover: pre-use inspection checklists, operator competency and certification requirements, exclusion zones around moving equipment, and the danger of blind spots. Discuss ground conditions and load limits relevant to this site."
+  },
+  {
+    "id": "tbt-14",
+    "num": "14",
+    "category": "Equipment and Machinery Safety",
+    "title": "Forklift Safety",
+    "content": "Cover: pedestrian exclusion zones, load stability and rated capacity, the danger of overhead obstructions, and mandatory horn use at blind corners. Only certificated operators may drive - confirm who on site holds a valid licence."
+  },
+  {
+    "id": "tbt-15",
+    "num": "15",
+    "category": "Equipment and Machinery Safety",
+    "title": "Lockout/Tagout (LOTO) Procedures",
+    "content": "Cover: isolating energy sources before maintenance, applying personal locks and tags, verifying zero energy state before starting work, and never removing another person's lock. This is one of the most safety-critical procedures on any site - walk through the steps for equipment relevant here."
+  },
+  {
+    "id": "tbt-16",
+    "num": "16",
+    "category": "Equipment and Machinery Safety",
+    "title": "Scaffolding Safety",
+    "content": "Cover: scaffolds may only be erected, altered or dismantled by competent, appointed persons (Construction Regulations reg 16), weekly inspection tags, guardrails and toe-boards, and never overloading a platform. Confirm today's scaffold inspection tag is current."
+  },
+  {
+    "id": "tbt-17",
+    "num": "17",
+    "category": "Equipment and Machinery Safety",
+    "title": "Ladder Safety",
+    "content": "Cover: the 4:1 angle rule, inspecting for damage before use, maintaining three points of contact, never standing on the top two rungs, and securing the ladder top and bottom. Remind the team ladders are for short-duration light work, not extended tasks."
+  },
+  {
+    "id": "tbt-18",
+    "num": "18",
+    "category": "Equipment and Machinery Safety",
+    "title": "Crane and Rigging Safety",
+    "content": "Cover: only certificated riggers and signallers, checking sling and shackle condition and rated capacity before every lift, exclusion zones under suspended loads, and clear hand signals or radio communication. Discuss the load chart for equipment in use on this site."
+  },
+  {
+    "id": "tbt-19",
+    "num": "19",
+    "category": "Equipment and Machinery Safety",
+    "title": "Welding and Cutting Safety",
+    "content": "Cover: fire watch requirements, removing combustibles from the work area, proper ventilation for fumes, eye and skin protection, and hot work permits. Discuss confined space precautions if welding will occur in an enclosed area."
+  },
+  {
+    "id": "tbt-20",
+    "num": "20",
+    "category": "Equipment and Machinery Safety",
+    "title": "Machine Guarding",
+    "content": "Cover: never removing or bypassing a guard, reporting damaged or missing guards immediately, and the specific pinch points and rotating parts on machinery used here. Ask if anyone has seen a guard removed or propped open recently."
+  },
+  {
+    "id": "tbt-21",
+    "num": "21",
+    "category": "Hazard-Specific Safety",
+    "title": "Working at Heights (Fall Protection)",
+    "content": "Cover: the requirement for a documented fall protection plan for any work above 2m, harness inspection before use, anchor point suitability, and rescue planning. Confirm today's task has been assessed and the right fall protection is in place."
+  },
+  {
+    "id": "tbt-22",
+    "num": "22",
+    "category": "Hazard-Specific Safety",
+    "title": "Confined Space Entry",
+    "content": "Cover: atmospheric testing before and during entry, permit-to-work requirements, standby person and rescue arrangements, and never entering without authorisation. Discuss what qualifies as a confined space on this site and why entry without a permit is strictly forbidden."
+  },
+  {
+    "id": "tbt-23",
+    "num": "23",
+    "category": "Hazard-Specific Safety",
+    "title": "Excavation and Trenching Safety",
+    "content": "Cover: shoring or benching requirements for trenches over 1.5m deep, daily inspection before entry, safe access/egress points, and keeping spoil piles back from the edge. Discuss underground services checks done for this excavation."
+  },
+  {
+    "id": "tbt-24",
+    "num": "24",
+    "category": "Hazard-Specific Safety",
+    "title": "Heat Stress Prevention",
+    "content": "Cover: recognising early signs (cramps, heavy sweating, fatigue) versus heat stroke (confusion, dry skin, collapse), hydration schedules, shaded rest breaks, and acclimatisation for new workers. Discuss today's conditions and adjust the work-rest schedule if needed."
+  },
+  {
+    "id": "tbt-25",
+    "num": "25",
+    "category": "Hazard-Specific Safety",
+    "title": "Cold Weather Safety",
+    "content": "Cover: layering and appropriate clothing, recognising early hypothermia and frostbite signs, warm-up breaks, and the added risk of reduced dexterity when handling tools in the cold."
+  },
+  {
+    "id": "tbt-26",
+    "num": "26",
+    "category": "Hazard-Specific Safety",
+    "title": "Noise Exposure and Hearing Protection",
+    "content": "Cover: which areas or tasks on this site exceed the noise action level, correct fitting of ear plugs or muffs, and the cumulative, irreversible nature of hearing damage. Ask the team if hearing protection has been comfortable and effective."
+  },
+  {
+    "id": "tbt-27",
+    "num": "27",
+    "category": "Hazard-Specific Safety",
+    "title": "Chemical Handling and Storage",
+    "content": "Cover: reading labels and SDS before use, compatible storage (never mixing incompatible chemicals), spill response procedures, and correct PPE for the specific chemical in use. Point out where chemicals are stored on this site."
+  },
+  {
+    "id": "tbt-28",
+    "num": "28",
+    "category": "Hazard-Specific Safety",
+    "title": "Asbestos Awareness",
+    "content": "Cover: asbestos is only a risk when disturbed - never drill, cut, or sand suspected asbestos-containing material. Discuss how to recognise likely locations in older buildings and the legal requirement to stop and report suspected asbestos rather than continue work."
+  },
+  {
+    "id": "tbt-29",
+    "num": "29",
+    "category": "Hazard-Specific Safety",
+    "title": "Lead Safety",
+    "content": "Cover: exposure routes (inhalation of dust/fumes, ingestion), the importance of not eating or smoking in lead work areas, handwashing before breaks, and medical surveillance requirements for exposed workers."
+  },
+  {
+    "id": "tbt-30",
+    "num": "30",
+    "category": "Hazard-Specific Safety",
+    "title": "Silica Dust Exposure",
+    "content": "Cover: which tasks generate silica dust (cutting, grinding, drilling concrete/masonry), wet cutting methods to suppress dust, respiratory protection requirements, and the long-term lung disease risk of repeated exposure."
+  },
+  {
+    "id": "tbt-31",
+    "num": "31",
+    "category": "Transportation and Vehicle Safety",
+    "title": "Defensive Driving",
+    "content": "Cover: maintaining safe following distance, anticipating other road users' mistakes, adjusting speed for conditions, and the danger of fatigue on long drives. Discuss any recent near-misses on the road relevant to this team."
+  },
+  {
+    "id": "tbt-32",
+    "num": "32",
+    "category": "Transportation and Vehicle Safety",
+    "title": "Backing Safety for Vehicles",
+    "content": "Cover: using a spotter/banksman where visibility is limited, checking mirrors and blind spots before reversing, and sounding the horn before moving. Discuss reversing hazards specific to this site's layout."
+  },
+  {
+    "id": "tbt-33",
+    "num": "33",
+    "category": "Transportation and Vehicle Safety",
+    "title": "Seat Belt Use in Work Vehicles",
+    "content": "Cover: seat belts are mandatory in all site and company vehicles regardless of distance or speed, and their role in preventing ejection during a collision or rollover. No exceptions, no excuses."
+  },
+  {
+    "id": "tbt-34",
+    "num": "34",
+    "category": "Transportation and Vehicle Safety",
+    "title": "Pedestrian Safety on Job Sites",
+    "content": "Cover: designated walkways separate from vehicle routes, high-visibility clothing requirements, eye contact with drivers/operators before crossing, and never walking behind reversing equipment."
+  },
+  {
+    "id": "tbt-35",
+    "num": "35",
+    "category": "Transportation and Vehicle Safety",
+    "title": "Distracted Driving Prevention",
+    "content": "Cover: the danger of phone use while driving (even hands-free), eating, or adjusting equipment while moving. Discuss the company's policy on phone use in vehicles and encourage pulling over for calls."
+  },
+  {
+    "id": "tbt-36",
+    "num": "36",
+    "category": "Health and Ergonomics",
+    "title": "Proper Lifting Techniques",
+    "content": "Cover: bending at the knees not the back, keeping the load close to the body, avoiding twisting while lifting, and asking for help or using mechanical aids for heavy/awkward loads. Demonstrate correct technique if practical."
+  },
+  {
+    "id": "tbt-37",
+    "num": "37",
+    "category": "Health and Ergonomics",
+    "title": "Repetitive Motion Injury Prevention",
+    "content": "Cover: recognising early signs of strain (tingling, numbness, aching), the value of micro-breaks and task rotation, and adjusting workstation or tool grip to reduce strain. Ask if anyone is experiencing discomfort from repetitive tasks."
+  },
+  {
+    "id": "tbt-38",
+    "num": "38",
+    "category": "Health and Ergonomics",
+    "title": "Workplace Ergonomics",
+    "content": "Cover: correct seating and screen height for desk-based work, adjusting workstations to the individual rather than the individual adjusting to the workstation, and the cumulative cost of poor posture over time."
+  },
+  {
+    "id": "tbt-39",
+    "num": "39",
+    "category": "Health and Ergonomics",
+    "title": "Hydration and Health on the Job",
+    "content": "Cover: the link between dehydration and reduced concentration/increased accident risk, especially in hot conditions, and encouraging regular water intake throughout the shift rather than only at breaks."
+  },
+  {
+    "id": "tbt-40",
+    "num": "40",
+    "category": "Health and Ergonomics",
+    "title": "Fatigue Management",
+    "content": "Cover: recognising the signs of fatigue in yourself and colleagues, the increased accident risk of long shifts or poor sleep, and the importance of speaking up if you're too tired to work safely. No task is worth pushing through dangerous fatigue."
+  },
+  {
+    "id": "tbt-41",
+    "num": "41",
+    "category": "Environmental and Job-Specific Safety",
+    "title": "Working Near Water Safety",
+    "content": "Cover: life jacket requirements near open water, rescue equipment availability, and the added risk of slippery surfaces near water bodies. Discuss specific water hazards on this site."
+  },
+  {
+    "id": "tbt-42",
+    "num": "42",
+    "category": "Environmental and Job-Specific Safety",
+    "title": "Lightning Safety Outdoors",
+    "content": "Cover: the 30-30 rule (seek shelter if thunder follows lightning within 30 seconds, wait 30 minutes after the last thunder before resuming), and which equipment/activities must stop immediately when lightning is detected on this site."
+  },
+  {
+    "id": "tbt-43",
+    "num": "43",
+    "category": "Environmental and Job-Specific Safety",
+    "title": "Wildlife and Insect Hazards",
+    "content": "Cover: awareness of snakes, spiders, bees/wasps and other local hazards relevant to this site's location, what to do if bitten or stung, and never approaching or provoking wildlife encountered on site."
+  },
+  {
+    "id": "tbt-44",
+    "num": "44",
+    "category": "Environmental and Job-Specific Safety",
+    "title": "Radiation Safety",
+    "content": "Only relevant where radiography, radioactive sources, or similar equipment are in use on this site. Cover: exclusion zones during use, dosimeter requirements for exposed workers, and strict adherence to the site's radiation safety officer's instructions."
+  },
+  {
+    "id": "tbt-45",
+    "num": "45",
+    "category": "Environmental and Job-Specific Safety",
+    "title": "Hydrogen Sulphide (H2S) Safety",
+    "content": "Relevant in wastewater, petrochemical, and some mining/agricultural settings. Cover: H2S is colourless and its 'rotten egg' smell disappears at dangerous concentrations (odour fatigue), the need for gas detectors in at-risk areas, and immediate evacuation on alarm."
+  },
+  {
+    "id": "tbt-46",
+    "num": "46",
+    "category": "Behavioral and Mental Safety",
+    "title": "Drug and Alcohol Awareness",
+    "content": "Cover: the OHS Act General Safety Regulations prohibit working under the influence, the danger impaired judgement poses to the whole team, and the confidential support available to anyone struggling with substance use. This is about safety, not punishment."
+  },
+  {
+    "id": "tbt-47",
+    "num": "47",
+    "category": "Behavioral and Mental Safety",
+    "title": "Workplace Violence Prevention",
+    "content": "Cover: recognising escalating conflict early, de-escalation basics, the reporting process for threats or aggressive behaviour, and the company's zero-tolerance stance on workplace violence."
+  },
+  {
+    "id": "tbt-48",
+    "num": "48",
+    "category": "Behavioral and Mental Safety",
+    "title": "Stress Management",
+    "content": "Cover: recognising stress in yourself and colleagues, healthy coping strategies, the impact of chronic stress on concentration and safety, and where to find support if work or personal stress is becoming overwhelming."
+  },
+  {
+    "id": "tbt-49",
+    "num": "49",
+    "category": "Behavioral and Mental Safety",
+    "title": "Mental Health Awareness",
+    "content": "Cover: reducing stigma around mental health conversations at work, recognising when a colleague may be struggling, and how to point someone toward support resources. A safe site looks after minds as well as bodies."
+  },
+  {
+    "id": "tbt-50",
+    "num": "50",
+    "category": "Behavioral and Mental Safety",
+    "title": "Team Communication for Safety",
+    "content": "Cover: speaking up when you see an unsafe act, the buddy system for high-risk tasks, clear handover communication between shifts, and creating a culture where raising concerns is welcomed, not punished."
+  }
+]

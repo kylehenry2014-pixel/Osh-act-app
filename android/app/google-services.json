@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "3389666081",
+    "project_id": "ohs-act-app",
+    "storage_bucket": "ohs-act-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:3389666081:android:39dd8434260f4e7bed4460",
+        "android_client_info": {
+          "package_name": "com.ohsactapp.ohs_act_regulations"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTsmlAxJ_dVgl4njTfcqjZcZFr0Q9aJR4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
