@@ -32,7 +32,7 @@ android {
     defaultConfig {
         applicationId = "com.ohsactapp.ohs_act_regulations"
         minSdk = 24
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -48,6 +48,12 @@ android {
         }
     }
 
+    packagingOptions {
+        jniLibs {
+            keepDebugSymbols += setOf("**/*.so")
+        }
+    }
+
     buildTypes {
         release {
             signingConfig = if (hasReleaseSigning) {
@@ -57,9 +63,6 @@ android {
             }
             isMinifyEnabled = false
             isShrinkResources = false
-            ndk {
-                debugSymbolLevel = "NONE"
-            }
         }
     }
 
