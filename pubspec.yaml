@@ -1,7 +1,7 @@
 name: ohs_act_regulations
 description: "OHS Act & Regulations - South African occupational health and safety reference app"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
