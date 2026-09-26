@@ -19,4 +19,15 @@ class ConnectivityService {
       return true;
     }
   }
+
+  /// Live stream of online/offline status, used by the app-wide
+  /// connectivity gate in main.dart so the whole app blocks immediately
+  /// if the connection drops, and unblocks as soon as it's back -
+  /// deliberately fails closed (reports offline) if the stream itself
+  /// errors, since the whole point of that gate is "no internet, no app".
+  Stream<bool> get onStatusChanged {
+    return Connectivity().onConnectivityChanged.map(
+          (results) => !results.contains(ConnectivityResult.none),
+        );
+  }
 }

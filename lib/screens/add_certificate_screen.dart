@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../data/certificates_repository.dart';
+import '../data/download_allowance_service.dart';
 import '../data/notification_service.dart';
 import '../models/certificate.dart';
 import '../theme/app_theme.dart';
@@ -111,6 +112,17 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
     if (_expiryDate == null) {
       setState(() => _error = 'Please set an expiry date.');
       return;
+    }
+
+    // Shared daily download/add allowance (2/day free, 20/day Pro) -
+    // only applies to genuinely new certificates, not edits.
+    if (!_isEditing) {
+      try {
+        await DownloadAllowanceService.instance.checkAndConsume();
+      } on DownloadLimitException catch (e) {
+        setState(() => _error = e.message);
+        return;
+      }
     }
 
     setState(() {

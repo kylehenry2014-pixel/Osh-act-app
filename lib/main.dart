@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'data/ad_service.dart';
 import 'data/bookmarks_repository.dart';
 import 'data/certificates_repository.dart';
+import 'data/connectivity_service.dart';
 import 'data/entries_repository.dart';
 import 'data/iso_repository.dart';
 import 'data/notification_service.dart';
@@ -42,8 +43,76 @@ class OhsApp extends StatelessWidget {
       title: 'OHS Act & Regulations',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: const RootShell(),
+      home: const _ConnectivityGate(child: RootShell()),
     );
+  }
+}
+
+/// Wraps the whole app: this app requires an internet connection to work
+/// at all times, not just for specific features. Blocks with a full-screen
+/// message the moment connectivity drops (including before the app has
+/// even finished loading), and unblocks automatically the instant it's
+/// back, without needing the user to do anything.
+class _ConnectivityGate extends StatefulWidget {
+  final Widget child;
+  const _ConnectivityGate({required this.child});
+
+  @override
+  State<_ConnectivityGate> createState() => _ConnectivityGateState();
+}
+
+class _ConnectivityGateState extends State<_ConnectivityGate> {
+  bool? _online;
+
+  @override
+  void initState() {
+    super.initState();
+    ConnectivityService.instance.isOnline().then((online) {
+      if (mounted) setState(() => _online = online);
+    });
+    ConnectivityService.instance.onStatusChanged.listen((online) {
+      if (mounted) setState(() => _online = online);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_online == false) {
+      return Scaffold(
+        backgroundColor: AppColors.paper,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.wifi_off, size: 48, color: AppColors.steel),
+                const SizedBox(height: 20),
+                Text('No internet connection',
+                    style: AppText.headline(size: 20),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 10),
+                Text(
+                  'This app requires an internet connection to work. Please check your connection and try again.',
+                  style: AppText.body(size: 14, color: AppColors.steel),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    // _online == null means the very first check hasn't returned yet -
+    // show a brief loading state rather than flashing the offline screen.
+    if (_online == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.paper,
+        body: Center(
+            child: CircularProgressIndicator(color: AppColors.amberDeep)),
+      );
+    }
+    return widget.child;
   }
 }
 

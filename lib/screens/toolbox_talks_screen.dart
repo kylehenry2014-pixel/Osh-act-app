@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import '../data/ad_service.dart';
+import '../data/download_allowance_service.dart';
 import '../data/subscription_repository.dart';
 import '../data/toolbox_talks_repository.dart';
 import '../models/toolbox_talk_entry.dart';
@@ -367,6 +368,20 @@ class _TalkDetailSheet extends StatelessWidget {
   }
 
   Future<void> _saveTalk(BuildContext context) async {
+    // Shared daily download allowance (2/day free, 20/day Pro) - checked
+    // first so we don't make a free user watch an ad only to find out
+    // they were already over their daily download limit.
+    try {
+      await DownloadAllowanceService.instance.checkAndConsume();
+    } on DownloadLimitException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+      return;
+    }
+
     try {
       if (!SubscriptionRepository.instance.isPro) {
         final adCount =

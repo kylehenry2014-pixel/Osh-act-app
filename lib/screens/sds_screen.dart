@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import '../data/ad_service.dart';
 import '../data/connectivity_service.dart';
+import '../data/download_allowance_service.dart';
 import '../data/sds_repository.dart';
 import '../data/subscription_repository.dart';
 import '../theme/app_theme.dart';
@@ -120,6 +121,20 @@ class _SdsScreenState extends State<SdsScreen> {
   Future<void> _saveSds() async {
     final result = _result;
     if (result == null || result.sdsUrl == null) return;
+
+    // Shared daily download allowance (2/day free, 20/day Pro) - checked
+    // first, before starting the actual download.
+    try {
+      await DownloadAllowanceService.instance.checkAndConsume();
+    } on DownloadLimitException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+      return;
+    }
+
     try {
       final response = await http.get(Uri.parse(result.sdsUrl!));
       if (response.statusCode < 200 || response.statusCode >= 300) {

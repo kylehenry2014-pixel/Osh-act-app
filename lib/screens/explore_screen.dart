@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../data/ad_service.dart';
 import '../data/entries_repository.dart';
+import '../data/subscription_repository.dart';
 import '../models/entry.dart';
 import '../theme/app_theme.dart';
 import 'detail_screen.dart';
@@ -13,6 +15,8 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class ExploreScreenState extends State<ExploreScreen> {
+  static const _sectionOpenFeatureKey = 'act_section_open';
+
   final _repo = EntriesRepository.instance;
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
@@ -54,7 +58,49 @@ class ExploreScreenState extends State<ExploreScreen> {
     return false;
   }
 
-  void _openEntry(Entry entry, List<Entry> pagingList) {
+  Future<bool?> _confirmWatchAd() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Watch an ad to continue'),
+        content: const Text('Watch a short ad to open this section.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Watch'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openEntry(Entry entry, List<Entry> pagingList) async {
+    if (!SubscriptionRepository.instance.isPro) {
+      final adCount =
+          await AdService.instance.nextRequiredAdCount(_sectionOpenFeatureKey);
+      if (!mounted) return;
+      final confirmed = await _confirmWatchAd();
+      if (confirmed != true) return;
+
+      final earned = await AdService.instance.watchAds(adCount);
+      if (!mounted) return;
+      if (!earned) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                "You'll need to watch the ad through to the end to open this section."),
+          ),
+        );
+        return;
+      }
+      await AdService.instance.recordUnlockedRequest(_sectionOpenFeatureKey);
+      if (!mounted) return;
+    }
+
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => DetailScreen(entries: pagingList, initialId: entry.id),
     ));
@@ -105,10 +151,13 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   Widget _buildBreadcrumb() {
     final crumbs = <Widget>[
-      _crumb('All', () => setState(() {
-            _browseCategory = null;
-            _browseCollection = null;
-          }), isLink: _browseCategory != null),
+      _crumb(
+          'All',
+          () => setState(() {
+                _browseCategory = null;
+                _browseCollection = null;
+              }),
+          isLink: _browseCategory != null),
     ];
     if (_browseCategory != null) {
       crumbs.add(_arrow());
@@ -124,7 +173,8 @@ class ExploreScreenState extends State<ExploreScreen> {
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 10, 22, 0),
-      child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: crumbs),
+      child:
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: crumbs),
     );
   }
 
@@ -134,7 +184,8 @@ class ExploreScreenState extends State<ExploreScreen> {
       );
 
   Widget _crumb(String text, VoidCallback? onTap, {required bool isLink}) {
-    final style = AppText.label(size: 12, color: isLink ? AppColors.amberDeep : AppColors.steel);
+    final style = AppText.label(
+        size: 12, color: isLink ? AppColors.amberDeep : AppColors.steel);
     if (!isLink || onTap == null) return Text(text, style: style);
     return InkWell(onTap: onTap, child: Text(text, style: style));
   }
@@ -198,7 +249,8 @@ class _Masthead extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Republic of South Africa', style: AppText.label(size: 10.5)),
+                  Text('Republic of South Africa',
+                      style: AppText.label(size: 10.5)),
                   Text('OHS Act & Regs', style: AppText.label(size: 10.5)),
                 ],
               ),
@@ -208,7 +260,9 @@ class _Masthead extends StatelessWidget {
                   style: AppText.headline(size: 26),
                   children: [
                     const TextSpan(text: 'OHS Act '),
-                    TextSpan(text: '&', style: TextStyle(color: AppColors.amberDeep)),
+                    TextSpan(
+                        text: '&',
+                        style: TextStyle(color: AppColors.amberDeep)),
                     const TextSpan(text: ' Regulations'),
                   ],
                 ),
@@ -267,7 +321,8 @@ class _SearchField extends StatelessWidget {
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   hintText: 'Search a topic, or jump with a code like "CR 8"',
-                  hintStyle: AppText.label(size: 13, color: AppColors.steel.withValues(alpha: 0.7)),
+                  hintStyle: AppText.label(
+                      size: 13, color: AppColors.steel.withValues(alpha: 0.7)),
                 ),
               ),
             ),
@@ -300,24 +355,41 @@ class _HomeGrid extends StatelessWidget {
   // work, not surfaced as a caveat to the person browsing.
   static const List<(String label, String? collection)> _otherActs = [
     ('Mine Health and Safety Act', 'Mine Health and Safety Act 29 of 1996'),
-    ('Compensation for Occupational Injuries and Diseases Act', 'Compensation for Occupational Injuries and Diseases Act 130 of 1993'),
-    ('National Environmental Management Act', 'National Environmental Management Act 107 of 1998'),
-    ('Basic Conditions of Employment Act', 'Basic Conditions of Employment Act 75 of 1997'),
+    (
+      'Compensation for Occupational Injuries and Diseases Act',
+      'Compensation for Occupational Injuries and Diseases Act 130 of 1993'
+    ),
+    (
+      'National Environmental Management Act',
+      'National Environmental Management Act 107 of 1998'
+    ),
+    (
+      'Basic Conditions of Employment Act',
+      'Basic Conditions of Employment Act 75 of 1997'
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     final repo = EntriesRepository.instance;
-    final ohsActCount = repo.all.where((e) => e.collection == 'Occupational Health and Safety Act 85 of 1993').length;
-    final regCategories = repo.categoriesPresent().where((c) => c != 'Act' && c != 'OtherActs').toList();
-    final regCount = regCategories.fold<int>(0, (sum, c) => sum + repo.countInCategory(c));
+    final ohsActCount = repo.all
+        .where((e) =>
+            e.collection == 'Occupational Health and Safety Act 85 of 1993')
+        .length;
+    final regCategories = repo
+        .categoriesPresent()
+        .where((c) => c != 'Act' && c != 'OtherActs')
+        .toList();
+    final regCount =
+        regCategories.fold<int>(0, (sum, c) => sum + repo.countInCategory(c));
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(6, 8, 6, 4),
-          child: Text('ACTS', style: AppText.label(size: 11, color: AppColors.amberDeep)),
+          child: Text('ACTS',
+              style: AppText.label(size: 11, color: AppColors.amberDeep)),
         ),
         _BrowseCard(
           title: 'Occupational Health and Safety Act',
@@ -326,14 +398,17 @@ class _HomeGrid extends StatelessWidget {
         ),
         ..._otherActs.map((act) {
           final (label, collection) = act;
-          final count = repo.all.where((e) => e.collection == collection).length;
+          final count =
+              repo.all.where((e) => e.collection == collection).length;
           final available = count > 0;
           return Opacity(
             opacity: available ? 1 : 0.5,
             child: _BrowseCard(
               title: label,
               subtitle: available ? '$count sections' : 'Coming soon',
-              onTap: available ? () => onSelectAct('OtherActs', collection!) : () {},
+              onTap: available
+                  ? () => onSelectAct('OtherActs', collection!)
+                  : () {},
             ),
           );
         }),
@@ -348,13 +423,20 @@ class _HomeGrid extends StatelessWidget {
 class _OhsActMenu extends StatelessWidget {
   final VoidCallback onSelectTheAct;
   final ValueChanged<String> onSelectCategory;
-  const _OhsActMenu({required this.onSelectTheAct, required this.onSelectCategory});
+  const _OhsActMenu(
+      {required this.onSelectTheAct, required this.onSelectCategory});
 
   @override
   Widget build(BuildContext context) {
     final repo = EntriesRepository.instance;
-    final ohsActCount = repo.all.where((e) => e.collection == 'Occupational Health and Safety Act 85 of 1993').length;
-    final regCategories = repo.categoriesPresent().where((c) => c != 'Act' && c != 'OtherActs').toList();
+    final ohsActCount = repo.all
+        .where((e) =>
+            e.collection == 'Occupational Health and Safety Act 85 of 1993')
+        .length;
+    final regCategories = repo
+        .categoriesPresent()
+        .where((c) => c != 'Act' && c != 'OtherActs')
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -366,14 +448,16 @@ class _OhsActMenu extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(6, 20, 6, 4),
-          child: Text('REGULATIONS', style: AppText.label(size: 11, color: AppColors.amberDeep)),
+          child: Text('REGULATIONS',
+              style: AppText.label(size: 11, color: AppColors.amberDeep)),
         ),
         ...regCategories.map((cat) {
           final count = repo.countInCategory(cat);
           final setCount = repo.collectionsInCategory(cat).length;
           return _BrowseCard(
             title: kCategoryLabel[cat] ?? cat,
-            subtitle: '$setCount regulation set${setCount == 1 ? '' : 's'} \u00b7 $count regulations',
+            subtitle:
+                '$setCount regulation set${setCount == 1 ? '' : 's'} \u00b7 $count regulations',
             onTap: () => onSelectCategory(cat),
           );
         }),
@@ -412,7 +496,8 @@ class _BrowseCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  const _BrowseCard({required this.title, required this.subtitle, required this.onTap});
+  const _BrowseCard(
+      {required this.title, required this.subtitle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -432,7 +517,9 @@ class _BrowseCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppText.headline(size: 16, weight: FontWeight.w600)),
+                  Text(title,
+                      style:
+                          AppText.headline(size: 16, weight: FontWeight.w600)),
                   const SizedBox(height: 3),
                   Text(subtitle, style: AppText.label(size: 11)),
                 ],
@@ -457,8 +544,10 @@ class _SectionList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 24),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
-      itemBuilder: (context, i) => _SectionRow(entry: items[i], onTap: () => onTap(items[i])),
+      separatorBuilder: (_, __) =>
+          const Divider(height: 1, color: AppColors.line),
+      itemBuilder: (context, i) =>
+          _SectionRow(entry: items[i], onTap: () => onTap(items[i])),
     );
   }
 }
@@ -467,7 +556,8 @@ class _SearchResultsList extends StatelessWidget {
   final List<Entry> results;
   final String query;
   final ValueChanged<Entry> onTap;
-  const _SearchResultsList({required this.results, required this.query, required this.onTap});
+  const _SearchResultsList(
+      {required this.results, required this.query, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -477,8 +567,10 @@ class _SearchResultsList extends StatelessWidget {
       itemCount: results.length,
       itemBuilder: (context, i) {
         final entry = results[i];
-        final showCategoryHeader = i == 0 || results[i - 1].category != entry.category;
-        final showCollectionHeader = i == 0 || results[i - 1].collection != entry.collection;
+        final showCategoryHeader =
+            i == 0 || results[i - 1].category != entry.category;
+        final showCollectionHeader =
+            i == 0 || results[i - 1].collection != entry.collection;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -491,7 +583,8 @@ class _SearchResultsList extends StatelessWidget {
             if (showCollectionHeader)
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 2, 22, 6),
-                child: Text(entry.collection, style: AppText.headline(size: 14, weight: FontWeight.w600)),
+                child: Text(entry.collection,
+                    style: AppText.headline(size: 14, weight: FontWeight.w600)),
               ),
             _SectionRow(entry: entry, onTap: () => onTap(entry)),
           ],
@@ -509,7 +602,8 @@ class _SectionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final snippet = entry.body.replaceAll('\n', ' ').trim();
-    final trimmed = snippet.length > 140 ? '${snippet.substring(0, 140)}…' : snippet;
+    final trimmed =
+        snippet.length > 140 ? '${snippet.substring(0, 140)}…' : snippet;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -524,14 +618,17 @@ class _SectionRow extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border.all(color: AppColors.ink, width: 1),
               ),
-              child: Text(entry.num, style: AppText.label(size: 11, color: AppColors.ink)),
+              child: Text(entry.num,
+                  style: AppText.label(size: 11, color: AppColors.ink)),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(entry.title, style: AppText.headline(size: 15.5, weight: FontWeight.w600)),
+                  Text(entry.title,
+                      style: AppText.headline(
+                          size: 15.5, weight: FontWeight.w600)),
                   const SizedBox(height: 3),
                   Text(trimmed,
                       style: AppText.body(size: 13, color: AppColors.steel),
