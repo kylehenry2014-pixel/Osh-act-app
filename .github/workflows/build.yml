@@ -37,6 +37,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Override targetSdkVersion
+        run: |
+          echo "flutter.targetSdkVersion=36" >> android/local.properties
+
       - name: Build App Bundle
         run: flutter build appbundle --release
 
