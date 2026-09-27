@@ -17,7 +17,7 @@ if (hasReleaseSigning) {
 android {
     namespace = "com.ohsactapp.ohs_act_regulations"
     compileSdk = 36
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -48,12 +48,6 @@ android {
         }
     }
 
-    packagingOptions {
-        jniLibs {
-            keepDebugSymbols += setOf("**/*.so")
-        }
-    }
-
     buildTypes {
         release {
             signingConfig = if (hasReleaseSigning) {
@@ -63,12 +57,22 @@ android {
             }
             isMinifyEnabled = false
             isShrinkResources = false
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
         }
     }
 
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
+    }
+
+    configurations.all {
+        resolutionStrategy {
+            force("com.android.billingclient:billing-ktx:8.0.0")
+            force("com.android.billingclient:billing:8.0.0")
+        }
     }
 }
 
