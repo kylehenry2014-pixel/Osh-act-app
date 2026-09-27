@@ -30,6 +30,9 @@
     background:var(--paper-raised); border:1px solid var(--line); padding:14px 16px;
     font-size:13px; color:var(--steel); margin:16px 0;
   }
+  table{ width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; }
+  th, td{ border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th{ background:var(--paper-raised); font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.04em; }
   .contact-box{
     background:var(--paper-raised); border:1.5px solid var(--ink); padding:20px; margin-top:16px;
   }
@@ -54,41 +57,61 @@
   <header>
     <div class="label">OHS Act &amp; Regulations</div>
     <h1>Privacy Policy</h1>
-    <div class="updated">Last updated: 18 August 2026</div>
+    <div class="updated">Last updated: 27 September 2026</div>
   </header>
 
   <p>This policy explains what information the OHS Act &amp; Regulations app collects, how it is used, and how to reach us with questions. We have tried to write it in plain language rather than dense legal text.</p>
 
   <h2>Summary</h2>
-  <p>The app does not require you to create an account, and it does not collect, store, or share your personal information on any server. Bookmarks, notes, and checklist progress you create in the app stay on your own device. The only information that ever leaves your device is what you choose to type into the optional bug report form.</p>
+  <p>You do not need to create a personal account to use this app. The app signs you in anonymously in the background so we can enforce daily usage limits on certain features and remember your subscription status - this does not identify you personally. Bookmarks, notes, saved certificates, and photos you add stay on your own device. The app shows ads (unless you have an active "Remove Ads" subscription), uses an AI assistant for two features, and lets you save documents to your device.</p>
 
-  <h2>What the app stores on your device</h2>
-  <p>If you use the Bookmarks, Notes, or Checklist features, the app saves that information locally on your phone using standard device storage. This never leaves your device, is not visible to us, and is not sent to any server. If you uninstall the app, this information is deleted along with it.</p>
+  <h2>Anonymous sign-in and usage limits</h2>
+  <p>When you open the app, it automatically signs you in anonymously using Firebase Authentication. This creates a random identifier for your device - it is not linked to your name, email, or any other personal account. We use this identifier only to:</p>
+  <ul>
+    <li>Enforce daily usage limits on the Safety Chat Bot, SDS Finder, and document downloads (free users get a limited number of uses per day; Pro subscribers get a higher limit)</li>
+    <li>Remember whether you have an active "Remove Ads" subscription</li>
+  </ul>
+  <p>This usage-count and subscription-status information is stored on our servers (Google Firestore), tied only to the anonymous device identifier, not to you personally.</p>
+
+  <h2>Safety Chat Bot and SDS Finder</h2>
+  <p>When you use the Safety Chat Bot or SDS Finder, the text you type (and, for SDS Finder, any photo you take of a chemical label) is sent to our backend server and then to Anthropic, our AI provider, to generate a response. This content is used only to answer your question and is not used to train AI models or shared for any other purpose. Photos you submit to SDS Finder are processed to identify the product and are not permanently stored by us.</p>
+
+  <h2>What the app stores only on your device</h2>
+  <p>The following stays on your phone and is never sent to our servers: bookmarks, personal notes on Act/Regulation sections, saved Certificate Reminders (including any photos you add of physical certificates), and your language preference. If you uninstall the app, this information is deleted along with it.</p>
+
+  <h2>Advertising</h2>
+  <p>Unless you have an active "Remove Ads" subscription, the app shows ads via Google's AdMob service to support free access to its features. AdMob may collect device and advertising identifiers to serve and measure ads, in line with <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's own privacy policy</a>. You can opt out of personalised advertising in your device's ad settings, and you can remove ads entirely with a Pro subscription.</p>
+
+  <h2>Subscriptions and purchases</h2>
+  <p>If you purchase the "Remove Ads" subscription, the purchase is handled entirely by Google Play Billing. We receive confirmation that a valid purchase was made (so we can enable your Pro features) but do not receive or store your payment details - these are handled by Google Play, not by us.</p>
+
+  <h2>Device permissions</h2>
+  <table>
+    <tr><th>Permission</th><th>Why it's used</th></tr>
+    <tr><td>Camera</td><td>To photograph a chemical label (SDS Finder) or a physical certificate (Certificate Reminders)</td></tr>
+    <tr><td>Photos/Storage</td><td>To choose an existing photo instead of taking a new one, and to save Toolbox Talks/SDS documents you download</td></tr>
+    <tr><td>Notifications</td><td>To remind you before a saved certificate expires</td></tr>
+    <tr><td>Internet/Network state</td><td>Required throughout the app, since it needs an active internet connection to function</td></tr>
+  </table>
 
   <h2>What happens when you submit a bug report</h2>
-  <p>The app includes an optional "Report a bug" form. If you choose to use it, the following is sent to Formspree, a third party form processing service, which forwards it to us by email:</p>
+  <p>The app includes an optional "Report a bug" form. If you choose to use it, the following is sent to Formspree, a third-party form processing service, which forwards it to us by email:</p>
   <ul>
     <li>The description you typed into the form</li>
     <li>The section of the app you were viewing at the time, if any</li>
     <li>Basic technical information about your device or browser</li>
   </ul>
-  <p>This information is used only to understand and fix the issue you reported. We do not use it for marketing, and we do not share it with anyone beyond what is needed to process the report.</p>
+  <p>This information is used only to understand and fix the issue you reported. We do not use it for marketing.</p>
 
   <h2>What the app does not do</h2>
   <ul>
-    <li>No advertising and no ad tracking of any kind</li>
-    <li>No analytics or usage tracking</li>
-    <li>No sale or sharing of personal information for marketing purposes</li>
-    <li>No account or login is required to use the app</li>
+    <li>No personal account, name, or email is required to use the app</li>
+    <li>No selling of your information to third parties</li>
+    <li>No sharing of your Chat Bot/SDS Finder content beyond what's needed to generate a response</li>
   </ul>
 
   <h2>Children's privacy</h2>
   <p>This app is a professional reference tool for occupational health and safety law and is not directed at children. We do not knowingly collect information from children.</p>
-
-  <h2>Future updates to this policy</h2>
-  <div class="note">
-    Planned features such as optional paid subscriptions and user accounts are not yet part of the app. When they are introduced, this policy will be updated in advance to describe exactly what additional information is involved, and the update will be clearly dated so you can see what has changed.
-  </div>
 
   <h2>Changes to this policy</h2>
   <p>If this policy changes, the updated version will be posted here with a new "last updated" date at the top of the page.</p>
