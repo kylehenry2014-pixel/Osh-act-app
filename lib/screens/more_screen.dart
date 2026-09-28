@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../data/ad_service.dart';
 import '../data/connectivity_service.dart';
@@ -13,6 +14,7 @@ import 'subscription_screen.dart';
 import 'toolbox_talks_screen.dart';
 
 const String _kFormspreeEndpoint = 'https://formspree.io/f/mkjwqjze';
+const String _kPrivacyPolicyUrl = 'https://ohs-act-app.web.app/privacy.html';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -41,6 +43,25 @@ class _MoreScreenState extends State<MoreScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$featureName is coming soon.')),
     );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    var launched = false;
+    try {
+      launched = await launchUrl(
+        Uri.parse(_kPrivacyPolicyUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      launched = false;
+    }
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open the privacy policy. Please try again.'),
+        ),
+      );
+    }
   }
 
   Future<bool?> _confirmWatchAds(int adCount, String actionLabel) {
@@ -421,6 +442,15 @@ class _MoreScreenState extends State<MoreScreen> {
                 Text(
                   'Text sourced from LawLibrary / Laws.Africa (CC BY 4.0), the Government Gazette, SAFLII, and Acts Online, checked current as of 2026. Every planned regulation set is complete: the OHS Act plus 25 full regulation sets across General, Health, Mechanical and Electrical categories. This app is an unofficial reference tool; for legal purposes consult the Government Gazette.',
                   style: AppText.label(size: 10.5),
+                ),
+                const SizedBox(height: 14),
+                InkWell(
+                  onTap: _openPrivacyPolicy,
+                  child: Text(
+                    'Privacy Policy',
+                    style: AppText.label(size: 12, color: AppColors.amberDeep)
+                        .copyWith(decoration: TextDecoration.underline),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 _BugReportSection(
