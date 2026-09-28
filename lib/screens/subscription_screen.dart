@@ -1,3 +1,4 @@
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -12,6 +13,8 @@ class SubscriptionScreen extends StatefulWidget {
 }
 
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
+  static const _loadTimeout = Duration(seconds: 15);
+
   List<ProductDetails> _products = [];
   bool _loading = true;
   bool _purchasing = false;
@@ -23,9 +26,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _loadProducts();
   }
 
+  void _retry() {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    _loadProducts();
+  }
+
   Future<void> _loadProducts() async {
     try {
-      final products = await SubscriptionRepository.instance.queryProducts();
+      final products = await SubscriptionRepository.instance
+          .queryProducts()
+          .timeout(_loadTimeout);
       if (!mounted) return;
       setState(() {
         _products = products;
@@ -34,6 +47,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           _error =
               'Subscriptions aren\'t available yet. Please try again later.';
         }
+      });
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error =
+            'The Play Store took too long to respond. Check your connection and try again.';
       });
     } catch (_) {
       if (!mounted) return;
@@ -107,8 +127,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Text('Skip the ads', style: AppText.headline(size: 22)),
                 const SizedBox(height: 10),
                 Text(
-                  'Get unlimited access to the Safety Chat Bot, Checklists, and '
-                  'Certificate Reminders - no ads to watch, ever.',
+                  'Remove all ads and raise your daily limits to 20 uses a day '
+                  'for the Safety Chat Bot and SDS Finder, and 20 saves a day '
+                  'for documents and certificates.',
                   style: AppText.body(size: 15, color: AppColors.steel),
                 ),
                 const SizedBox(height: 28),
@@ -128,6 +149,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   const SizedBox(height: 16),
                   Text(_error!,
                       style: AppText.label(size: 12, color: AppColors.red)),
+                ],
+                if (!_loading && _products.isEmpty) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _retry,
+                    child: Text(
+                      'Try again',
+                      style:
+                          AppText.label(size: 12, color: AppColors.amberDeep),
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 20),
                 Center(
@@ -210,8 +242,9 @@ class _AlreadySubscribed extends StatelessWidget {
             Text('You\'re subscribed', style: AppText.headline(size: 18)),
             const SizedBox(height: 8),
             Text(
-              'Ads are removed across the Safety Chat Bot, Checklists, and '
-              'Certificate Reminders.',
+              'Ads are removed, and your daily limits are raised to 20 uses a '
+              'day for the Safety Chat Bot and SDS Finder, and 20 saves a day '
+              'for documents and certificates.',
               textAlign: TextAlign.center,
               style: AppText.body(size: 14, color: AppColors.steel),
             ),
