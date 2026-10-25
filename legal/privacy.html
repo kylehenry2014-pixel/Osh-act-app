@@ -19,7 +19,7 @@
     background: repeating-linear-gradient(-45deg, var(--amber), var(--amber) 12px, var(--ink) 12px, var(--ink) 24px);
   }
   .wrap{ max-width:680px; margin:0 auto; padding:0 22px 60px; }
-  header{ padding:26px 0 16px; border-bottom:1px solid var(--ink)3a; }
+  header{ padding:26px 0 16px; border-bottom:1px solid #1B1E193a; }
   .label{ font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; color:var(--steel); }
   h1{ font-family:Georgia, serif; font-weight:700; font-size:26px; margin:10px 0 4px; }
   .updated{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--steel); }
@@ -57,13 +57,13 @@
   <header>
     <div class="label">OHS Act &amp; Regulations</div>
     <h1>Privacy Policy</h1>
-    <div class="updated">Last updated: 27 September 2026</div>
+    <div class="updated">Last updated: 25 October 2026</div>
   </header>
 
   <p>This policy explains what information the OHS Act &amp; Regulations app collects, how it is used, and how to reach us with questions. We have tried to write it in plain language rather than dense legal text.</p>
 
   <h2>Summary</h2>
-  <p>You do not need to create a personal account to use this app. The app signs you in anonymously in the background so we can enforce daily usage limits on certain features and remember your subscription status - this does not identify you personally. Bookmarks, notes, saved certificates, and photos you add stay on your own device. The app shows ads (unless you have an active "Remove Ads" subscription), uses an AI assistant for two features, and lets you save documents to your device.</p>
+  <p>You do not need to create a personal account to use this app. The app signs you in anonymously in the background so we can enforce daily usage limits on certain features and remember your subscription status - this does not identify you personally. Bookmarks, notes, saved certificates, and photos you add stay on your own device. The app shows ads (unless you have an active "Remove Ads" subscription), uses an AI assistant for two features, and lets you save documents to your device. If you buy the "Remove Ads" subscription, we verify the purchase with Google Play and store only the resulting subscription status.</p>
 
   <h2>Anonymous sign-in and usage limits</h2>
   <p>When you open the app, it automatically signs you in anonymously using Firebase Authentication. This creates a random identifier for your device - it is not linked to your name, email, or any other personal account. We use this identifier only to:</p>
@@ -83,7 +83,9 @@
   <p>Unless you have an active "Remove Ads" subscription, the app shows ads via Google's AdMob service to support free access to its features. AdMob may collect device and advertising identifiers to serve and measure ads, in line with <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's own privacy policy</a>. You can opt out of personalised advertising in your device's ad settings, and you can remove ads entirely with a Pro subscription.</p>
 
   <h2>Subscriptions and purchases</h2>
-  <p>If you purchase the "Remove Ads" subscription, the purchase is handled entirely by Google Play Billing. We receive confirmation that a valid purchase was made (so we can enable your Pro features) but do not receive or store your payment details - these are handled by Google Play, not by us.</p>
+  <p>If you purchase the "Remove Ads" subscription, the payment is handled entirely by Google Play Billing. We do not receive or store your payment details - these are handled by Google Play, not by us.</p>
+  <p>After a purchase, the app sends the purchase token and product identifier from Google Play to our backend server. Our server checks that purchase directly with Google Play to confirm it is valid and active. When Google confirms it, we record your Pro subscription status (active or inactive, and the related purchase details needed to keep it up to date) against your anonymous device identifier in Google Firestore. Purchases that Google does not confirm are rejected and do not enable Pro features.</p>
+  <p>This purchase information is not linked to your name or email address and is used only to enable and maintain your Pro features.</p>
 
   <h2>Device permissions</h2>
   <table>
@@ -103,6 +105,9 @@
   </ul>
   <p>This information is used only to understand and fix the issue you reported. We do not use it for marketing.</p>
 
+  <h2>Deleting your data</h2>
+  <p>Data stored on your device is deleted when you uninstall the app. To request deletion of the usage and subscription records held on our servers for your anonymous device identifier, send a request through the contact form below or email adminoshactapp@gmail.com. We will delete the records we can associate with your request.</p>
+
   <h2>What the app does not do</h2>
   <ul>
     <li>No personal account, name, or email is required to use the app</li>
@@ -117,7 +122,7 @@
   <p>If this policy changes, the updated version will be posted here with a new "last updated" date at the top of the page.</p>
 
   <h2>Contact us</h2>
-  <p>If you have a question about this policy or about your information, use the form below rather than a public email address, so your message reaches us directly and privately.</p>
+  <p>If you have a question about this policy or about your information, you can email us at <a href="mailto:adminoshactapp@gmail.com">adminoshactapp@gmail.com</a> or use the form below. Both reach us directly and privately.</p>
 
   <div class="contact-box">
     <input type="text" id="name" placeholder="Your name (optional)">
