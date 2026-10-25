@@ -85,15 +85,19 @@ class SubscriptionRepository {
     for (final purchase in purchases) {
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
-        await _verifyAndGrant(purchase);
-      }
-      if (purchase.pendingCompletePurchase) {
+        final verified = await _verifyAndGrant(purchase);
+        // Acknowledge only after the server confirms the purchase with Google.
+        if (verified && purchase.pendingCompletePurchase) {
+          await _iap.completePurchase(purchase);
+        }
+      } else if (purchase.pendingCompletePurchase) {
+        // Error or canceled purchases must still be completed.
         await _iap.completePurchase(purchase);
       }
     }
   }
 
-  Future<void> _verifyAndGrant(PurchaseDetails purchase) async {
+  Future<bool> _verifyAndGrant(PurchaseDetails purchase) async {
     try {
       final callable = _functions.httpsCallable('verifyPurchase');
       await callable.call<Map<String, dynamic>>({
@@ -101,8 +105,11 @@ class SubscriptionRepository {
         'purchaseToken': purchase.verificationData.serverVerificationData,
         'platform': 'android',
       });
+      return true;
     } catch (_) {
-      // Swallow - the Firestore listener is the source of truth.
+      // Verification failed (rejected or network). Leave the purchase
+      // unacknowledged so it is delivered again and retried on the next launch.
+      return false;
     }
   }
 
