@@ -32,6 +32,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_native_splash: ^2.4.0
 
 flutter:
   uses-material-design: true
@@ -41,3 +42,10 @@ flutter:
     - assets/data/translations_af.json
     - assets/toolbox_talks_index_v2.json
     - assets/toolbox_talks/
+
+flutter_native_splash:
+  background_image: assets/splash/splash_background.png
+  android_12:
+    color: "#DA9B2A"
+  ios: false
+  web: false
