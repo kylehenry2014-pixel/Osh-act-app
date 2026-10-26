@@ -15,6 +15,7 @@ import 'data/translations_repository.dart';
 import 'theme/app_theme.dart';
 import 'screens/explore_screen.dart';
 import 'screens/more_screen.dart';
+import 'widgets/ohs_splash.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +44,35 @@ class OhsApp extends StatelessWidget {
       title: 'OHS Act & Regulations',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: const _ConnectivityGate(child: RootShell()),
+      home: const _SplashGate(child: _ConnectivityGate(child: RootShell())),
+    );
+  }
+}
+
+/// Shows the animated OHS splash on top of the app, then removes it.
+class _SplashGate extends StatefulWidget {
+  final Widget child;
+  const _SplashGate({required this.child});
+
+  @override
+  State<_SplashGate> createState() => _SplashGateState();
+}
+
+class _SplashGateState extends State<_SplashGate> {
+  bool _showSplash = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        widget.child,
+        if (_showSplash)
+          Positioned.fill(
+            child: OhsSplash(
+              onFinished: () => setState(() => _showSplash = false),
+            ),
+          ),
+      ],
     );
   }
 }
