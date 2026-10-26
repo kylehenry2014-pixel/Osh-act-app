@@ -440,7 +440,7 @@ class _MoreScreenState extends State<MoreScreen> {
                 _card(
                   onTap: () => _showComingSoon('Safety Consultant Finder'),
                   title: 'Safety Consultant Finder',
-                  subtitle: 'Find registered safety professionals by province',
+                  subtitle: 'Find registered safety professionals in your area',
                   comingSoon: true,
                 ),
                 const SizedBox(height: 12),

@@ -18,7 +18,7 @@ class AdService {
 
   static const String _testRewardedAdUnitId =
       'ca-app-pub-3940256099942544/5224354917';
-  static const bool _useTestAds = true;
+  static const bool _useTestAds = false;
 
   static String get _adUnitId =>
       _useTestAds ? _testRewardedAdUnitId : _rewardedAdUnitId;
