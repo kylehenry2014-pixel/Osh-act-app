@@ -454,7 +454,7 @@ class _MoreScreenState extends State<MoreScreen> {
                 const Divider(color: AppColors.line),
                 const SizedBox(height: 16),
                 Text(
-                  'Text sourced from LawLibrary / Laws.Africa (CC BY 4.0), the Government Gazette, SAFLII, and Acts Online, checked current as of 2026. Every planned regulation set is complete: the OHS Act plus 25 full regulation sets across General, Health, Mechanical and Electrical categories. This app is an unofficial reference tool; for legal purposes consult the Government Gazette.',
+                  'Text sourced from the official Occupational Health and Safety Act 85 of 1993 and key Regulations, drawn from the South African Government, LawLibrary / Laws.Africa (CC BY 4.0) and Acts Online. This app is an independent, unofficial reference tool. For legal purposes, consult the official Government Gazette.',
                   style: AppText.label(size: 10.5),
                 ),
                 const SizedBox(height: 14),

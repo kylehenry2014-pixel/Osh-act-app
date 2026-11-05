@@ -42,7 +42,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 16, 22, 4),
               child: Text(
-                'Only the English text is the official, legally authoritative version, sourced directly from the Government Gazette. Other languages are unofficial translations provided for convenience.',
+                'The English text is taken from the official Act and Regulations. Other languages are unofficial translations provided for convenience. For legal purposes, consult the official Government Gazette.',
                 style: AppText.label(size: 11),
               ),
             ),
