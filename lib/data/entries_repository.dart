@@ -50,6 +50,10 @@ const Map<String, String> kCodeMap = {
   'COIDA': 'COIDA',
   'MHSA': 'MHSA',
   'NEMA': 'NEMA',
+  'BCEA': 'BCEA',
+  'POPIA': 'POPIA',
+  'CPA': 'CPA',
+  'CONST': 'Constitution',
 };
 
 final RegExp _codeJumpPattern =

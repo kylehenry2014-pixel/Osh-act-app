@@ -7,6 +7,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
+/// Temporary: while true, the Remove Ads card always shows on the More screen
+/// and the subscription screen explains why products could not be loaded.
+/// Set to false once the paywall works, to restore the normal behaviour.
+const bool kShowPaywallDiagnostics = true;
+
 class SubscriptionRepository {
   static final SubscriptionRepository instance = SubscriptionRepository._();
   SubscriptionRepository._();
@@ -64,12 +69,40 @@ class SubscriptionRepository {
     return true;
   }
 
+  /// A short, human-readable reason for the last empty product query. Only
+  /// shown on screen while kShowPaywallDiagnostics is true.
+  String? lastQueryDiagnostic;
+
   Future<List<ProductDetails>> queryProducts() async {
-    if (Firebase.apps.isEmpty) return [];
-    final available = await _iap.isAvailable();
-    if (!available) return [];
-    final response = await _iap.queryProductDetails(productIds);
-    return response.productDetails;
+    lastQueryDiagnostic = null;
+    try {
+      if (Firebase.apps.isEmpty) {
+        lastQueryDiagnostic = 'Firebase is not initialised.';
+        return [];
+      }
+      final available = await _iap.isAvailable();
+      if (!available) {
+        lastQueryDiagnostic =
+            'Google Play Billing is not available. Is the app installed from Google Play, and is the Play Store up to date?';
+        return [];
+      }
+      final response = await _iap.queryProductDetails(productIds);
+      final error = response.error;
+      if (error != null) {
+        lastQueryDiagnostic =
+            'Play returned an error: ' + error.code + ' - ' + error.message;
+      } else if (response.notFoundIDs.isNotEmpty) {
+        lastQueryDiagnostic = 'Play did not find these product IDs: ' +
+            response.notFoundIDs.join(', ') +
+            ' (check the ID, and that the subscription and its base plan are Active).';
+      } else if (response.productDetails.isEmpty) {
+        lastQueryDiagnostic = 'Play returned no products.';
+      }
+      return response.productDetails;
+    } catch (e) {
+      lastQueryDiagnostic = 'Error while asking Play for products: ' + e.toString();
+      return [];
+    }
   }
 
   Future<void> buy(ProductDetails product) async {

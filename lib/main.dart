@@ -5,6 +5,7 @@ import 'data/ad_service.dart';
 import 'data/bookmarks_repository.dart';
 import 'data/certificates_repository.dart';
 import 'data/connectivity_service.dart';
+import 'data/daily_citation_service.dart';
 import 'data/entries_repository.dart';
 import 'data/iso_repository.dart';
 import 'data/notification_service.dart';
@@ -169,6 +170,7 @@ class _RootShellState extends State<RootShell> {
   Future<void> _loadData() async {
     try {
       await EntriesRepository.instance.load();
+      DailyCitationService.instance.refresh();
       await BookmarksRepository.instance.load();
       await IsoRepository.instance.load();
       await TranslationsRepository.instance.load();

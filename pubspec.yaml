@@ -1,7 +1,7 @@
 name: ohs_act_regulations
 description: "OHS Act & Regulations - South African occupational health and safety reference app"
 publish_to: 'none'
-version: 1.0.0+11
+version: 1.0.0+12
 environment:
   sdk: '>=3.3.0 <4.0.0'
 
@@ -42,6 +42,8 @@ flutter:
     - assets/data/translations_af.json
     - assets/toolbox_talks_index_v2.json
     - assets/toolbox_talks/
+    - assets/data/signage.json
+    - assets/signage/
 
 flutter_native_splash:
   background_image: assets/splash/splash_background.png

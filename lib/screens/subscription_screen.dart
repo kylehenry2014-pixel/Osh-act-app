@@ -150,6 +150,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Text(_error!,
                       style: AppText.label(size: 12, color: AppColors.red)),
                 ],
+                if (kShowPaywallDiagnostics &&
+                    !_loading &&
+                    _products.isEmpty &&
+                    SubscriptionRepository.instance.lastQueryDiagnostic != null) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    'Details: ' +
+                        SubscriptionRepository.instance.lastQueryDiagnostic!,
+                    style: AppText.label(size: 11),
+                  ),
+                ],
                 if (!_loading && _products.isEmpty) ...[
                   const SizedBox(height: 8),
                   TextButton(

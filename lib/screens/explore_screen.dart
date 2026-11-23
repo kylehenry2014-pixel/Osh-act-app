@@ -382,6 +382,13 @@ class _HomeGrid extends StatelessWidget {
         .toList();
     final regCount =
         regCategories.fold<int>(0, (sum, c) => sum + repo.countInCategory(c));
+    // Every Act in the data that is not in the fixed list above (for example
+    // POPIA, the CPA and the Constitution) is shown automatically.
+    final List<(String, String?)> acts = [
+      ..._otherActs,
+      for (final c in repo.collectionsInCategory('OtherActs'))
+        if (!_otherActs.any((a) => a.$2 == c)) (c, c),
+    ];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -396,7 +403,7 @@ class _HomeGrid extends StatelessWidget {
           subtitle: '$ohsActCount sections, plus $regCount regulations',
           onTap: onSelectOhsAct,
         ),
-        ..._otherActs.map((act) {
+        ...acts.map((act) {
           final (label, collection) = act;
           final count =
               repo.all.where((e) => e.collection == collection).length;

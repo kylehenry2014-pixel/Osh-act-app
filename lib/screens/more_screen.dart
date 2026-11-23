@@ -10,6 +10,8 @@ import '../data/subscription_repository.dart';
 import 'certificates_screen.dart';
 import 'chat_screen.dart';
 import 'sds_screen.dart';
+import 'signage_screen.dart';
+import 'daily_citation_screen.dart';
 import 'subscription_screen.dart';
 import 'toolbox_talks_screen.dart';
 
@@ -313,7 +315,7 @@ class _MoreScreenState extends State<MoreScreen> {
                       SubscriptionRepository.instance.isProNotifier,
                   builder: (context, isPro, _) {
                     if (isPro) return const SizedBox.shrink();
-                    return FutureBuilder(future: SubscriptionRepository.instance.queryProducts(), builder: (context, snap) { if (snap.connectionState != ConnectionState.done || (snap.data ?? const []).isEmpty) return const SizedBox.shrink(); return Padding(
+                    return FutureBuilder(future: SubscriptionRepository.instance.queryProducts(), builder: (context, snap) { if (snap.connectionState != ConnectionState.done || ((snap.data ?? const []).isEmpty && !kShowPaywallDiagnostics)) return const SizedBox.shrink(); return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
                         onTap: () => Navigator.of(context).push(
@@ -385,6 +387,26 @@ class _MoreScreenState extends State<MoreScreen> {
                   subtitle:
                       '${CertificatesRepository.instance.all.length} saved',
                 ),
+                const SizedBox(height: 12),
+                _card(
+                  onTap: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const SignageScreen(),
+                    ));
+                  },
+                  title: 'Signage',
+                  subtitle: '132 safety signs',
+                ),
+                const SizedBox(height: 12),
+                _card(
+                  onTap: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const DailyCitationScreen(),
+                    ));
+                  },
+                  title: 'Daily Citation',
+                  subtitle: 'A section from the Acts, every day at 12:00',
+                ),
                 const SizedBox(height: 28),
                 const Divider(color: AppColors.line),
                 const SizedBox(height: 16),
@@ -413,13 +435,6 @@ class _MoreScreenState extends State<MoreScreen> {
                   onTap: () => _showComingSoon('Investigations'),
                   title: 'Investigations',
                   subtitle: 'Incident investigation & reporting forms',
-                  comingSoon: true,
-                ),
-                const SizedBox(height: 12),
-                _card(
-                  onTap: () => _showComingSoon('Signage'),
-                  title: 'Signage',
-                  subtitle: 'Safety signage templates and guides',
                   comingSoon: true,
                 ),
                 const SizedBox(height: 12),
@@ -454,7 +469,7 @@ class _MoreScreenState extends State<MoreScreen> {
                 const Divider(color: AppColors.line),
                 const SizedBox(height: 16),
                 Text(
-                  'Text sourced from the official Occupational Health and Safety Act 85 of 1993 and key Regulations, drawn from the South African Government, LawLibrary / Laws.Africa (CC BY 4.0) and Acts Online. This app is an independent, unofficial reference tool. For legal purposes, consult the official Government Gazette.',
+                  'Text is taken from the official Acts and Regulations published in the Government Gazette. Sources include the South African Government (gov.za), LawLibrary / Laws.Africa (CC BY 4.0) and Acts Online. This app is an independent, unofficial reference tool. For legal purposes, consult the official Government Gazette.',
                   style: AppText.label(size: 10.5),
                 ),
                 const SizedBox(height: 14),
