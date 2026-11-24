@@ -80,13 +80,13 @@ class SubscriptionRepository {
         lastQueryDiagnostic = 'Firebase is not initialised.';
         return [];
       }
-      final available = await _iap.isAvailable();
+      final available = await _iap.isAvailable().timeout(const Duration(seconds: 10));
       if (!available) {
         lastQueryDiagnostic =
             'Google Play Billing is not available. Is the app installed from Google Play, and is the Play Store up to date?';
         return [];
       }
-      final response = await _iap.queryProductDetails(productIds);
+      final response = await _iap.queryProductDetails(productIds).timeout(const Duration(seconds: 10));
       final error = response.error;
       if (error != null) {
         lastQueryDiagnostic =

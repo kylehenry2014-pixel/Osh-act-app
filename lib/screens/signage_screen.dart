@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import '../data/ad_service.dart';
 import '../data/download_allowance_service.dart';
@@ -256,6 +259,35 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
     );
   }
 
+  /// Converts the bundled WebP sign into PNG bytes, which every phone gallery,
+  /// printer app and document editor can open.
+  Future<Uint8List> _assetAsPng(String assetPath) async {
+    final data = await rootBundle.load(assetPath);
+    final bytes =
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final byteData =
+        await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+    if (byteData == null) {
+      throw StateError('Could not convert the sign to PNG');
+    }
+    return byteData.buffer
+        .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+  }
+
+  /// A safe file name made from the sign label, for example "No_smoking".
+  String _safeFileName(String label, String fallback) {
+    final cleaned = label
+        .replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_');
+    if (cleaned.isEmpty) return fallback;
+    return cleaned.length > 60 ? cleaned.substring(0, 60) : cleaned;
+  }
+
   Future<void> _download() async {
     if (_downloading) return;
     setState(() => _downloading = true);
@@ -263,25 +295,39 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
       await DownloadAllowanceService.instance.checkAndConsume();
 
       final sign = widget.sign;
-      final data = await rootBundle.load(sign.file);
+      final png = await _assetAsPng(sign.file);
+      final fileName = _safeFileName(sign.label, sign.id);
       final dir = await getTemporaryDirectory();
-      final ext = sign.file.contains('.') ? sign.file.split('.').last : 'webp';
-      final tmp = File('${dir.path}/${sign.id}.$ext');
-      await tmp.writeAsBytes(
-        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-        flush: true,
-      );
+      final tmp = File('${dir.path}/$fileName.png');
+      await tmp.writeAsBytes(png, flush: true);
 
+      // Keep a copy inside the app (My Documents) ...
       await SavedDocumentsRepository.instance.saveDocument(
         sourcePath: tmp.path,
         name: sign.label,
         category: 'Signage',
       );
+
+      // ... and let the user save a copy to the phone itself (Downloads,
+      // Pictures, or any folder) through the system save dialog.
+      String? savedPath;
+      try {
+        savedPath = await FlutterFileDialog.saveFile(
+          params: SaveFileDialogParams(
+            sourceFilePath: tmp.path,
+            fileName: '$fileName.png',
+          ),
+        );
+      } catch (_) {
+        savedPath = null;
+      }
       try {
         await tmp.delete();
       } catch (_) {}
 
-      _snack('Saved to My Documents.');
+      _snack(savedPath != null
+          ? 'Saved to your phone and My Documents.'
+          : 'Saved to My Documents. Tap Download again and choose a folder to keep a copy on your phone.');
     } on DownloadLimitException catch (e) {
       _snack(e.message);
     } catch (_) {
@@ -356,7 +402,7 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
                           color: AppColors.paperRaised,
                         ),
                       )
-                    : Text('Save to My Documents',
+                    : Text('Download',
                         style: AppText.label(
                             size: 12, color: AppColors.paperRaised)),
               ),

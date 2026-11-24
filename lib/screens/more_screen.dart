@@ -315,7 +315,7 @@ class _MoreScreenState extends State<MoreScreen> {
                       SubscriptionRepository.instance.isProNotifier,
                   builder: (context, isPro, _) {
                     if (isPro) return const SizedBox.shrink();
-                    return FutureBuilder(future: SubscriptionRepository.instance.queryProducts(), builder: (context, snap) { if (snap.connectionState != ConnectionState.done || ((snap.data ?? const []).isEmpty && !kShowPaywallDiagnostics)) return const SizedBox.shrink(); return Padding(
+                    return FutureBuilder(future: SubscriptionRepository.instance.queryProducts(), builder: (context, snap) { if (!kShowPaywallDiagnostics && (snap.connectionState != ConnectionState.done || (snap.data ?? const []).isEmpty)) return const SizedBox.shrink(); return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
                         onTap: () => Navigator.of(context).push(
