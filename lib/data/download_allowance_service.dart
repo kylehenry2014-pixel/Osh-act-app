@@ -7,11 +7,22 @@ class DownloadLimitException implements Exception {
   DownloadLimitException(this.message);
 }
 
-/// Checks and consumes one unit of the shared daily download/add
-/// allowance (Toolbox Talks saves, SDS saves, adding a Certificate) -
-/// 2/day for free users, 20/day for Pro, enforced server-side via the
-/// checkDownloadAllowance Cloud Function so it can't be bypassed by
-/// clearing local app data.
+/// What the server reports after one unit has been consumed. [limit] is 0
+/// when an older server version did not send the numbers.
+class DownloadAllowance {
+  final int used;
+  final int limit;
+  const DownloadAllowance(this.used, this.limit);
+}
+
+/// Checks and consumes one unit of a daily download/add allowance, enforced
+/// server-side via the checkDownloadAllowance Cloud Function so it can't be
+/// bypassed by clearing local app data.
+///
+/// With no [feature], this is the shared pool (Toolbox Talks saves, SDS
+/// saves, adding a Certificate): 2/day free, 20/day Pro.
+/// With feature 'signage', signage downloads have their own pool:
+/// 2/day free, 5/day Pro.
 class DownloadAllowanceService {
   DownloadAllowanceService._();
   static final DownloadAllowanceService instance = DownloadAllowanceService._();
@@ -19,7 +30,7 @@ class DownloadAllowanceService {
   /// Call this right before actually performing a save/download/add.
   /// Throws [DownloadLimitException] if the daily limit has been
   /// reached - the caller should show that message and not proceed.
-  Future<void> checkAndConsume() async {
+  Future<DownloadAllowance> checkAndConsume({String? feature}) async {
     if (Firebase.apps.isEmpty) {
       throw DownloadLimitException(
           'Not connected yet. Please try again in a moment.');
@@ -27,7 +38,16 @@ class DownloadAllowanceService {
     try {
       final callable =
           FirebaseFunctions.instance.httpsCallable('checkDownloadAllowance');
-      await callable.call();
+      final result = await callable
+          .call(feature == null ? null : <String, dynamic>{'feature': feature});
+      final data = result.data;
+      var used = 0;
+      var limit = 0;
+      if (data is Map) {
+        used = (data['used'] as num?)?.toInt() ?? 0;
+        limit = (data['limit'] as num?)?.toInt() ?? 0;
+      }
+      return DownloadAllowance(used, limit);
     } on FirebaseFunctionsException catch (e) {
       if (e.code == 'resource-exhausted') {
         throw DownloadLimitException(

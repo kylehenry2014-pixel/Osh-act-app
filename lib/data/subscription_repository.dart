@@ -73,20 +73,30 @@ class SubscriptionRepository {
   /// shown on screen while kShowPaywallDiagnostics is true.
   String? lastQueryDiagnostic;
 
-  Future<List<ProductDetails>> queryProducts() async {
+  Future<List<ProductDetails>>? _inFlightQuery;
+
+  /// Calls made while a query is already running share that one query.
+  Future<List<ProductDetails>> queryProducts() {
+    return _inFlightQuery ??=
+        _queryProductsOnce().whenComplete(() => _inFlightQuery = null);
+  }
+
+  Future<List<ProductDetails>> _queryProductsOnce() async {
     lastQueryDiagnostic = null;
+    var stage = 'connecting to Play billing';
     try {
       if (Firebase.apps.isEmpty) {
         lastQueryDiagnostic = 'Firebase is not initialised.';
         return [];
       }
-      final available = await _iap.isAvailable().timeout(const Duration(seconds: 10));
+      final available = await _iap.isAvailable().timeout(const Duration(seconds: 20));
       if (!available) {
         lastQueryDiagnostic =
             'Google Play Billing is not available. Is the app installed from Google Play, and is the Play Store up to date?';
         return [];
       }
-      final response = await _iap.queryProductDetails(productIds).timeout(const Duration(seconds: 10));
+      stage = 'loading the product from Play';
+      final response = await _iap.queryProductDetails(productIds).timeout(const Duration(seconds: 20));
       final error = response.error;
       if (error != null) {
         lastQueryDiagnostic =
@@ -100,7 +110,7 @@ class SubscriptionRepository {
       }
       return response.productDetails;
     } catch (e) {
-      lastQueryDiagnostic = 'Error while asking Play for products: ' + e.toString();
+      lastQueryDiagnostic = 'Error while ' + stage + ': ' + e.toString();
       return [];
     }
   }

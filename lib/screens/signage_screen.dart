@@ -292,7 +292,8 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
     if (_downloading) return;
     setState(() => _downloading = true);
     try {
-      await DownloadAllowanceService.instance.checkAndConsume();
+      final allowance = await DownloadAllowanceService.instance
+          .checkAndConsume(feature: 'signage');
 
       final sign = widget.sign;
       final png = await _assetAsPng(sign.file);
@@ -325,9 +326,14 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
         await tmp.delete();
       } catch (_) {}
 
-      _snack(savedPath != null
-          ? 'Saved to your phone and My Documents.'
-          : 'Saved to My Documents. Tap Download again and choose a folder to keep a copy on your phone.');
+      final left = allowance.limit - allowance.used;
+      final leftText = allowance.limit > 0 && left >= 0
+          ? ' $left of ${allowance.limit} signage downloads left today.'
+          : '';
+      _snack((savedPath != null
+              ? 'Saved to your phone and My Documents.'
+              : 'Saved to My Documents. Tap Download again and choose a folder to keep a copy on your phone.') +
+          leftText);
     } on DownloadLimitException catch (e) {
       _snack(e.message);
     } catch (_) {
@@ -405,6 +411,13 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
                     : Text('Download',
                         style: AppText.label(
                             size: 12, color: AppColors.paperRaised)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Free: 2 signage downloads a day. Pro: 5 a day.',
+                style: AppText.label(size: 11),
               ),
             ),
             const SizedBox(height: 20),
