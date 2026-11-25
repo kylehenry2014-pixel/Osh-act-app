@@ -9,11 +9,60 @@ class IsoRepository {
   List<IsoClause> _clauses = [];
   bool _loaded = false;
 
-  Future<void> load() async {
-    if (_loaded) return;
-    final raw = await rootBundle.loadString('assets/data/iso_clauses.json');
-    final List<dynamic> jsonList = json.decode(raw) as List<dynamic>;
-    _clauses = jsonList.map((e) => IsoClause.fromJson(e as Map<String, dynamic>)).toList();
+  Future<void>? _catalogueLoading;
+
+  Future<void> load() {
+    if (_loaded) return Future<void>.value();
+
+    return _catalogueLoading ??=
+        _loadCatalogue().whenComplete(
+          () => _catalogueLoading = null,
+        );
+  }
+
+  Future<void> _loadCatalogue() async {
+    final raw = await rootBundle.loadString(
+      'assets/data/iso_clauses.json',
+    );
+
+    final decoded = jsonDecode(raw);
+
+    if (decoded is! List || decoded.isEmpty) {
+      throw const FormatException(
+        'ISO catalogue is invalid or empty.',
+      );
+    }
+
+    final clauses = <IsoClause>[];
+    final ids = <String>{};
+
+    for (final item in decoded) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Invalid ISO clause record.',
+        );
+      }
+
+      final clause = IsoClause.fromJson(item);
+
+      if (clause.id.trim().isEmpty ||
+          clause.standardId.trim().isEmpty ||
+          clause.standardName.trim().isEmpty) {
+        throw const FormatException(
+          'Incomplete ISO clause record.',
+        );
+      }
+
+      if (!ids.add(clause.id)) {
+        throw const FormatException(
+          'Duplicate ISO clause ID.',
+        );
+      }
+
+      clauses.add(clause);
+    }
+
+    _clauses = clauses;
     _loaded = true;
   }
 

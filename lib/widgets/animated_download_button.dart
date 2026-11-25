@@ -32,16 +32,16 @@ class _AnimatedDownloadButtonState extends State<AnimatedDownloadButton> {
   _DownloadState _state = _DownloadState.idle;
 
   Future<void> _handleTap() async {
-    if (_state != _DownloadState.idle) return;
+    if (!mounted || _state != _DownloadState.idle) return;
     setState(() => _state = _DownloadState.loading);
     try {
       await widget.onDownload();
       if (!mounted) return;
       setState(() => _state = _DownloadState.success);
       await Future.delayed(const Duration(milliseconds: 1200));
-    } catch (_) {
-      // Caller is responsible for surfacing the error (e.g. a SnackBar);
-      // this widget just resets back to idle so the person can retry.
+    } catch (error) {
+      // The caller owns customer-facing error messages.
+      debugPrint('Download operation failed: $error');
     } finally {
       if (mounted) setState(() => _state = _DownloadState.idle);
     }
@@ -75,7 +75,7 @@ class _AnimatedDownloadButtonState extends State<AnimatedDownloadButton> {
     };
 
     return InkWell(
-      onTap: _handleTap,
+      onTap: _state == _DownloadState.idle ? _handleTap : null,
       borderRadius: BorderRadius.circular(2),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -87,7 +87,9 @@ class _AnimatedDownloadButtonState extends State<AnimatedDownloadButton> {
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
+              duration: MediaQuery.of(context).disableAnimations
+                  ? Duration.zero
+                  : const Duration(milliseconds: 220),
               transitionBuilder: (child, animation) =>
                   ScaleTransition(scale: animation, child: child),
               child: _iconFor(_state),

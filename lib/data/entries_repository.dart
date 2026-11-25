@@ -77,13 +77,60 @@ class EntriesRepository {
     }
   }
 
-  Future<void> load() async {
-    if (_loaded) return;
-    final raw = await rootBundle.loadString('assets/data/entries.json');
-    final List<dynamic> jsonList = json.decode(raw) as List<dynamic>;
-    _entries = jsonList
-        .map((e) => Entry.fromJson(e as Map<String, dynamic>))
-        .toList();
+  Future<void>? _catalogueLoading;
+
+  Future<void> load() {
+    if (_loaded) return Future<void>.value();
+
+    return _catalogueLoading ??=
+        _loadCatalogue().whenComplete(
+          () => _catalogueLoading = null,
+        );
+  }
+
+  Future<void> _loadCatalogue() async {
+    final raw = await rootBundle.loadString(
+      'assets/data/entries.json',
+    );
+
+    final decoded = jsonDecode(raw);
+
+    if (decoded is! List || decoded.isEmpty) {
+      throw const FormatException(
+        'Legislation catalogue is invalid or empty.',
+      );
+    }
+
+    final entries = <Entry>[];
+    final ids = <String>{};
+
+    for (final item in decoded) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Invalid legislation record.',
+        );
+      }
+
+      final entry = Entry.fromJson(item);
+
+      if (entry.id.trim().isEmpty ||
+          entry.collection.trim().isEmpty ||
+          entry.category.trim().isEmpty) {
+        throw const FormatException(
+          'Incomplete legislation record.',
+        );
+      }
+
+      if (!ids.add(entry.id)) {
+        throw const FormatException(
+          'Duplicate legislation entry ID.',
+        );
+      }
+
+      entries.add(entry);
+    }
+
+    _entries = entries;
     _loaded = true;
   }
 

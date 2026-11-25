@@ -1,120 +1,515 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
+
 import '../models/certificate.dart';
 
-/// Schedules local (on-device) notifications reminding the user before a
-/// certificate expires. Entirely offline - no server involved, so this
-/// works even without Firebase configured.
-///
-/// Reminder schedule: 30, 14, 7 and 1 day(s) before expiry, plus one on the
-/// day itself. Each certificate gets a block of notification IDs derived
-/// from a hash of its own id, so scheduling/cancelling one certificate's
-/// reminders never touches another's.
 class NotificationService {
-  static final NotificationService instance = NotificationService._();
+  static final NotificationService instance =
+      NotificationService._();
+
   NotificationService._();
 
   final _plugin = FlutterLocalNotificationsPlugin();
+
   bool _initialized = false;
+  Future<void>? _initializing;
 
-  static const List<int> _reminderDaysBefore = [30, 14, 7, 1, 0];
+  Future<void> _queue = Future<void>.value();
 
-  Future<void> init() async {
-    if (_initialized) return;
+  static const List<int> _reminderDaysBefore = [
+    30, 14, 7, 1, 0,
+  ];
+
+  static const String _idMapKey =
+      'certificate_notification_ids_v2';
+
+  static const String _nextIdKey =
+      'certificate_notification_next_id_v2';
+
+  static const String _migrationKey =
+      'certificate_notification_migration_v2';
+
+  // Reserved certificate range.
+  // Daily citations use IDs starting at 9,000,000.
+  static const int _firstId = 10000000;
+  static const int _lastId = 2000000000;
+  static const int _blockSize = 10;
+
+  Future<T> _serialise<T>(
+    Future<T> Function() operation,
+  ) {
+    final result = _queue.then((_) => operation());
+
+    _queue = result.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {
+        debugPrint('Notification operation failed: $error');
+      },
+    );
+
+    return result;
+  }
+
+  Future<void> init() {
+    if (_initialized) return Future<void>.value();
+
+    return _initializing ??= _initialize().whenComplete(
+      () => _initializing = null,
+    );
+  }
+
+  Future<void> _initialize() async {
     tz_data.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await _refreshTimezone();
+
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
     const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: false, // we ask explicitly in requestPermissions()
+      requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
+
     await _plugin.initialize(
-      const InitializationSettings(android: androidSettings, iOS: iosSettings),
+      const InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      ),
     );
+
     _initialized = true;
   }
 
-  /// Requests notification permission. Safe to call multiple times - the OS
-  /// only prompts once; subsequent calls just report the current state.
+  Future<void> _refreshTimezone() async {
+    try {
+      final timezoneName =
+          await FlutterTimezone.getLocalTimezone();
+
+      tz.setLocalLocation(
+        tz.getLocation(timezoneName),
+      );
+    } catch (error) {
+      // The scheduling helper below converts native local
+      // DateTime values to absolute instants if this fails.
+      debugPrint('Device timezone lookup failed: $error');
+    }
+  }
+
   Future<bool> requestPermissions() async {
-    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (androidImpl != null) {
-      final granted = await androidImpl.requestNotificationsPermission();
-      // Exact-alarm permission is separate on Android 12+; without it,
-      // reminders may fire a little late but will still fire.
-      await androidImpl.requestExactAlarmsPermission();
-      return granted ?? false;
+    await init();
+
+    final android =
+        _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    if (android != null) {
+      try {
+        final granted =
+            await android.requestNotificationsPermission();
+
+        return granted ?? false;
+      } catch (error) {
+        debugPrint('Notification permission failed: $error');
+        return false;
+      }
     }
-    final iosImpl = _plugin.resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>();
-    if (iosImpl != null) {
-      final granted = await iosImpl.requestPermissions(alert: true, badge: true, sound: true);
-      return granted ?? false;
+
+    final ios =
+        _plugin.resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+
+    if (ios != null) {
+      try {
+        final granted = await ios.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+        return granted ?? false;
+      } catch (error) {
+        debugPrint('iOS notification permission failed: $error');
+        return false;
+      }
     }
+
     return true;
   }
 
-  /// Schedules (or reschedules) all reminders for a certificate. Call this
-  /// whenever a certificate is added or its expiry date/name changes.
-  Future<void> scheduleForCertificate(Certificate cert) async {
-    await cancelForCertificate(cert.id);
+  /// Optional exact alarm access.
+  /// Not requested automatically when saving certificates.
+  Future<bool> requestExactAlarmAccess() async {
+    await init();
 
-    for (var i = 0; i < _reminderDaysBefore.length; i++) {
+    final android =
+        _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    if (android == null) return true;
+
+    try {
+      return await android.requestExactAlarmsPermission()
+          ?? false;
+    } catch (error) {
+      debugPrint('Exact alarm access unavailable: $error');
+      return false;
+    }
+  }
+
+  Future<Map<String, int>> _readIdMap(
+    SharedPreferences prefs,
+  ) async {
+    final raw = prefs.getString(_idMapKey);
+
+    if (raw == null) return <String, int>{};
+
+    final decoded = jsonDecode(raw);
+
+    if (decoded is! Map) {
+      throw StateError('Invalid notification ID storage.');
+    }
+
+    final result = <String, int>{};
+    final used = <int>{};
+
+    for (final entry in decoded.entries) {
+      final value = entry.value;
+
+      if (entry.key is! String ||
+          value is! int ||
+          value < _firstId ||
+          value > _lastId ||
+          value % _blockSize != 0 ||
+          !used.add(value)) {
+        throw StateError('Invalid notification ID allocation.');
+      }
+
+      result[entry.key as String] = value;
+    }
+
+    return result;
+  }
+
+  Future<int> _allocateId(String certId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = await _readIdMap(prefs);
+
+    final existing = map[certId];
+
+    if (existing != null) return existing;
+
+    var next = prefs.getInt(_nextIdKey) ?? _firstId;
+
+    if (next < _firstId || next % _blockSize != 0) {
+      next = _firstId;
+    }
+
+    for (final value in map.values) {
+      if (value >= next) {
+        next = value + _blockSize;
+      }
+    }
+
+    if (next + _blockSize > _lastId) {
+      throw StateError('Notification ID range exhausted.');
+    }
+
+    map[certId] = next;
+
+    if (!await prefs.setString(
+      _idMapKey,
+      jsonEncode(map),
+    )) {
+      throw StateError('Could not save notification IDs.');
+    }
+
+    if (!await prefs.setInt(
+      _nextIdKey,
+      next + _blockSize,
+    )) {
+      throw StateError('Could not save notification counter.');
+    }
+
+    return next;
+  }
+
+  Future<void> scheduleForCertificate(
+    Certificate cert,
+  ) {
+    return _serialise(() async {
+      await init();
+      await _refreshTimezone();
+      await _scheduleCertificate(cert);
+    });
+  }
+
+  Future<void> _scheduleCertificate(
+    Certificate cert,
+  ) async {
+    final baseId = await _allocateId(cert.id);
+    final now = DateTime.now();
+
+    final android =
+        _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    var exactAllowed = false;
+
+    if (android != null) {
+      try {
+        exactAllowed =
+            await android.canScheduleExactNotifications()
+                ?? false;
+      } catch (error) {
+        debugPrint('Exact alarm check failed: $error');
+      }
+    }
+
+    var failures = 0;
+
+    for (var i = 0;
+        i < _reminderDaysBefore.length;
+        i++) {
       final daysBefore = _reminderDaysBefore[i];
+      final id = baseId + i;
+
+      // Calendar-day arithmetic avoids DST subtraction errors.
       final fireDate = DateTime(
         cert.expiryDate.year,
         cert.expiryDate.month,
-        cert.expiryDate.day,
-        9, // 9am local time - a reasonable time to see a reminder
-      ).subtract(Duration(days: daysBefore));
+        cert.expiryDate.day - daysBefore,
+        9,
+      );
 
-      if (fireDate.isBefore(DateTime.now())) continue; // don't schedule past reminders
+      try {
+        if (!fireDate.isAfter(now)) {
+          await _plugin.cancel(id);
+          continue;
+        }
 
-      final title = daysBefore == 0
-          ? '${cert.name} expires today'
-          : '${cert.name} expires in $daysBefore day${daysBefore == 1 ? '' : 's'}';
+        final title = daysBefore == 0
+            ? '${cert.name} expires today'
+            : '${cert.name} expires in $daysBefore '
+              'day${daysBefore == 1 ? '' : 's'}';
 
-      await _plugin.zonedSchedule(
-        _notificationId(cert.id, i),
-        title,
-        'Expiry date: ${_formatDate(cert.expiryDate)}. Open the app to review.',
-        tz.TZDateTime.from(fireDate, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'certificate_expiry',
-            'Certificate Expiry Reminders',
-            channelDescription: 'Reminders before your saved certificates expire',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
+        final body =
+            'Expiry date: ${_formatDate(cert.expiryDate)}. '
+            'Open the app to review.';
+
+        final when = tz.TZDateTime.from(
+          fireDate,
+          tz.local,
+        );
+
+        await _scheduleReminder(
+          id: id,
+          title: title,
+          body: body,
+          when: when,
+          exactAllowed: exactAllowed,
+          payload: 'certificate:${cert.id}',
+        );
+      } catch (error) {
+        failures++;
+        debugPrint(
+          'Certificate reminder $id failed: $error',
+        );
+      }
+    }
+
+    if (failures > 0) {
+      throw StateError(
+        '$failures certificate reminder(s) could not be updated.',
       );
     }
   }
 
-  /// Cancels every scheduled reminder for a certificate. Call this when a
-  /// certificate is deleted, or right before rescheduling on an edit.
-  Future<void> cancelForCertificate(String certId) async {
-    for (var i = 0; i < _reminderDaysBefore.length; i++) {
-      await _plugin.cancel(_notificationId(certId, i));
+  Future<void> _scheduleReminder({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime when,
+    required bool exactAllowed,
+    required String payload,
+  }) async {
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'certificate_expiry',
+        'Certificate Expiry Reminders',
+        channelDescription:
+            'Reminders before your saved certificates expire',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+
+    Future<void> schedule(
+      AndroidScheduleMode mode,
+    ) {
+      return _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        when,
+        details,
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
     }
+
+    if (exactAllowed) {
+      try {
+        await schedule(
+          AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        return;
+      } catch (error) {
+        debugPrint(
+          'Exact scheduling failed; trying inexact: $error',
+        );
+      }
+    }
+
+    await schedule(
+      AndroidScheduleMode.inexactAllowWhileIdle,
+    );
   }
 
-  /// Derives a stable, small int notification ID from the certificate's id
-  /// and reminder slot, so each of a certificate's up-to-5 reminders has a
-  /// unique, deterministic ID we can cancel individually later.
-  int _notificationId(String certId, int slot) {
-    final hash = certId.hashCode & 0x7FFFFFFF; // keep positive
-    return (hash % 100000) * 10 + slot;
+  Future<void> cancelForCertificate(
+    String certId,
+  ) {
+    return _serialise(() async {
+      await init();
+
+      final prefs =
+          await SharedPreferences.getInstance();
+
+      final map = await _readIdMap(prefs);
+      final baseId = map[certId];
+
+      if (baseId == null) return;
+
+      for (var i = 0;
+          i < _reminderDaysBefore.length;
+          i++) {
+        await _plugin.cancel(baseId + i);
+      }
+
+      map.remove(certId);
+
+      if (!await prefs.setString(
+        _idMapKey,
+        jsonEncode(map),
+      )) {
+        throw StateError(
+          'Could not update notification ID storage.',
+        );
+      }
+    });
   }
 
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  /// Rebuild reminders from existing certificate records.
+  /// Call only after the certificate repository has loaded.
+  Future<void> reconcileCertificates(
+    List<Certificate> certificates,
+  ) {
+    final snapshot = List<Certificate>.of(certificates);
+
+    return _serialise(() async {
+      await init();
+      await _refreshTimezone();
+
+      final prefs =
+          await SharedPreferences.getInstance();
+
+      var failures = 0;
+
+      // Schedule replacement reminders before removing
+      // notifications from the legacy ID range.
+      for (final cert in snapshot) {
+        try {
+          await _scheduleCertificate(cert);
+        } catch (error) {
+          failures++;
+          debugPrint(
+            'Certificate reminder reconciliation failed: $error',
+          );
+        }
+      }
+
+      if (failures == 0 &&
+          !(prefs.getBool(_migrationKey) ?? false)) {
+        final pending =
+            await _plugin.pendingNotificationRequests();
+
+        for (final request in pending) {
+          // Previous certificate IDs were below 1,000,000.
+          // Daily citation IDs are outside this range.
+          if (request.id >= 0 &&
+              request.id < 1000000 &&
+              request.id % 10 < 5) {
+            await _plugin.cancel(request.id);
+          }
+        }
+
+        if (!await prefs.setBool(_migrationKey, true)) {
+          throw StateError(
+            'Could not record notification migration.',
+          );
+        }
+      }
+
+      // Remove reminders belonging to deleted certificates.
+      final map = await _readIdMap(prefs);
+      final activeIds =
+          snapshot.map((cert) => cert.id).toSet();
+
+      final staleIds = map.keys
+          .where((id) => !activeIds.contains(id))
+          .toList();
+
+      for (final certId in staleIds) {
+        final baseId = map[certId]!;
+
+        for (var i = 0;
+            i < _reminderDaysBefore.length;
+            i++) {
+          await _plugin.cancel(baseId + i);
+        }
+
+        map.remove(certId);
+      }
+
+      if (!await prefs.setString(
+        _idMapKey,
+        jsonEncode(map),
+      )) {
+        throw StateError(
+          'Could not reconcile notification IDs.',
+        );
+      }
+
+      if (failures > 0) {
+        throw StateError(
+          '$failures certificate(s) require reminder retry.',
+        );
+      }
+    });
+  }
+
+  String _formatDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/'
+      '${date.year}';
 }

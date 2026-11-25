@@ -25,6 +25,8 @@ class _SignageScreenState extends State<SignageScreen> {
 
   final _repo = SignageRepository.instance;
   bool _loading = true;
+  bool _openingSign = false;
+  bool _loadInProgress = false;
   String? _error;
 
   @override
@@ -34,6 +36,8 @@ class _SignageScreenState extends State<SignageScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted || _loadInProgress) return;
+    _loadInProgress = true;
     setState(() {
       _loading = true;
       _error = null;
@@ -48,6 +52,8 @@ class _SignageScreenState extends State<SignageScreen> {
         _loading = false;
         _error = 'Could not load the signage library. Please try again.';
       });
+    } finally {
+      _loadInProgress = false;
     }
   }
 
@@ -72,31 +78,72 @@ class _SignageScreenState extends State<SignageScreen> {
   }
 
   Future<void> _openSign(SafetySign sign) async {
-    if (!SubscriptionRepository.instance.isPro) {
-      final adCount =
-          await AdService.instance.nextRequiredAdCount(_openFeatureKey);
-      if (!mounted) return;
-      final confirmed = await _confirmWatchAd();
-      if (confirmed != true) return;
+    if (!mounted || _openingSign || _loading) return;
 
-      final earned = await AdService.instance.watchAds(adCount);
-      if (!mounted) return;
-      if (!earned) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                "You'll need to watch the ad through to the end to open this sign."),
-          ),
-        );
+    setState(() => _openingSign = true);
+
+    try {
+      if (!SubscriptionRepository.instance.isPro) {
+        final adCount = await AdService.instance
+            .nextRequiredAdCount(_openFeatureKey);
+
+        if (!mounted ||
+            ModalRoute.of(context)?.isCurrent != true) {
+          return;
+        }
+
+        final confirmed = await _confirmWatchAd();
+
+        if (!mounted || confirmed != true) return;
+
+        final earned =
+            await AdService.instance.watchAds(adCount);
+
+        if (!mounted) return;
+
+        if (!earned) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            const SnackBar(
+              content: Text(
+                "You'll need to complete the required ads "
+                "to open this sign.",
+              ),
+            ),
+          );
+          return;
+        }
+
+        await AdService.instance
+            .recordUnlockedRequest(_openFeatureKey);
+      }
+
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
         return;
       }
-      await AdService.instance.recordUnlockedRequest(_openFeatureKey);
-      if (!mounted) return;
-    }
 
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => SignDetailScreen(sign: sign),
-    ));
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SignDetailScreen(sign: sign),
+        ),
+      );
+    } catch (error) {
+      debugPrint('Sign opening failed: $error');
+
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not open this sign. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _openingSign = false);
+      }
+    }
   }
 
   @override
@@ -172,7 +219,7 @@ class _SignageScreenState extends State<SignageScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, i) => _SignCard(
                 sign: signs[i],
-                onTap: () => _openSign(signs[i]),
+                onTap: _openingSign ? null : () => _openSign(signs[i]),
               ),
               childCount: signs.length,
             ),
@@ -194,7 +241,7 @@ class _SignageScreenState extends State<SignageScreen> {
 
 class _SignCard extends StatelessWidget {
   final SafetySign sign;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   const _SignCard({required this.sign, required this.onTap});
 
   @override
@@ -266,16 +313,29 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
     final bytes =
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    final byteData =
-        await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    frame.image.dispose();
-    codec.dispose();
-    if (byteData == null) {
-      throw StateError('Could not convert the sign to PNG');
+
+    try {
+      final frame = await codec.getNextFrame();
+
+      try {
+        final byteData = await frame.image.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+
+        if (byteData == null) {
+          throw StateError('Could not convert the sign to PNG');
+        }
+
+        return byteData.buffer.asUint8List(
+          byteData.offsetInBytes,
+          byteData.lengthInBytes,
+        );
+      } finally {
+        frame.image.dispose();
+      }
+    } finally {
+      codec.dispose();
     }
-    return byteData.buffer
-        .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
   }
 
   /// A safe file name made from the sign label, for example "No_smoking".
@@ -289,18 +349,36 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
   }
 
   Future<void> _download() async {
-    if (_downloading) return;
+    if (!mounted || _downloading) return;
     setState(() => _downloading = true);
-    try {
-      final allowance = await DownloadAllowanceService.instance
-          .checkAndConsume(feature: 'signage');
 
+    Directory? temporaryFolder;
+
+    try {
       final sign = widget.sign;
       final png = await _assetAsPng(sign.file);
       final fileName = _safeFileName(sign.label, sign.id);
       final dir = await getTemporaryDirectory();
-      final tmp = File('${dir.path}/$fileName.png');
+      final folder = await dir.createTemp('ohs_sign_');
+      temporaryFolder = folder;
+
+      final tmp = File('${folder.path}/$fileName.png');
       await tmp.writeAsBytes(png, flush: true);
+
+      if (png.isEmpty || await tmp.length() != png.length) {
+        throw StateError('The prepared sign is incomplete.');
+      }
+
+      // Check local document storage before consuming allowance.
+      await SavedDocumentsRepository.instance.load();
+
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+
+      final allowance = await DownloadAllowanceService.instance
+          .checkAndConsume(feature: 'signage');
 
       // Keep a copy inside the app (My Documents) ...
       await SavedDocumentsRepository.instance.saveDocument(
@@ -311,6 +389,11 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
 
       // ... and let the user save a copy to the phone itself (Downloads,
       // Pictures, or any folder) through the system save dialog.
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+
       String? savedPath;
       try {
         savedPath = await FlutterFileDialog.saveFile(
@@ -319,27 +402,34 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
             fileName: '$fileName.png',
           ),
         );
-      } catch (_) {
+      } catch (error) {
+        debugPrint('External sign export failed: $error');
         savedPath = null;
       }
-      try {
-        await tmp.delete();
-      } catch (_) {}
 
-      final left = allowance.limit - allowance.used;
+      final left = allowance.remaining;
       final leftText = allowance.limit > 0 && left >= 0
           ? ' $left of ${allowance.limit} signage downloads left today.'
           : '';
-      _snack((savedPath != null
+      _snack((savedPath != null && savedPath.isNotEmpty
               ? 'Saved to your phone and My Documents.'
-              : 'Saved to My Documents. Tap Download again and choose a folder to keep a copy on your phone.') +
+              : 'Saved to My Documents. No additional phone copy was saved.') +
           leftText);
     } on DownloadLimitException catch (e) {
       _snack(e.message);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Sign download failed: $error');
       _snack('Could not save this sign. Please try again.');
     } finally {
-      if (mounted) setState(() => _downloading = false);
+      try {
+        await temporaryFolder?.delete(recursive: true);
+      } catch (error) {
+        debugPrint('Temporary sign cleanup failed: $error');
+      }
+
+      if (mounted) {
+        setState(() => _downloading = false);
+      }
     }
   }
 

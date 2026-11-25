@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import '../data/saved_documents_repository.dart';
@@ -15,42 +17,190 @@ class MyDocumentsScreen extends StatefulWidget {
 }
 
 class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
-  Future<void> _open(SavedDocument document) async {
-    final result = await OpenFile.open(document.filePath);
+  final _repo = SavedDocumentsRepository.instance;
+
+  bool _operationBusy = false;
+  bool _loading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDocuments();
+  }
+
+  void _snack(String message) {
     if (!mounted) return;
-    if (result.type != ResultType.done) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Could not open this document: ${result.message}')),
+
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _loadDocuments() async {
+    if (!mounted || _operationBusy) return;
+
+    setState(() {
+      _operationBusy = true;
+      _loading = true;
+      _loadError = null;
+    });
+
+    try {
+      await _repo.load();
+    } catch (error) {
+      debugPrint('Document loading failed: $error');
+
+      if (!mounted) return;
+
+      _loadError =
+          'Your saved documents could not be loaded. '
+          'Existing files have not been deleted.';
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _operationBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _open(SavedDocument document) async {
+    if (!mounted || _operationBusy) return;
+
+    setState(() => _operationBusy = true);
+
+    try {
+      final file = File(document.filePath);
+
+      if (!await file.exists()) {
+        _snack(
+          'This document is no longer available on your device.',
+        );
+        return;
+      }
+
+      if (await file.length() == 0) {
+        _snack(
+          'This document is empty or damaged.',
+        );
+        return;
+      }
+
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+
+      final result = await OpenFile.open(document.filePath);
+
+      if (!mounted) return;
+
+      if (result.type != ResultType.done) {
+        debugPrint('Document opening failed: ${result.message}');
+
+        _snack(
+          'Could not open this document. '
+          'Check that a compatible application is installed.',
+        );
+      }
+    } catch (error) {
+      debugPrint('Document opening error: $error');
+
+      _snack(
+        'Unable to open this document. Please try again.',
       );
+    } finally {
+      if (mounted) {
+        setState(() => _operationBusy = false);
+      }
     }
   }
 
   Future<void> _confirmDelete(SavedDocument document) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete "${document.name}"?',
-            style: AppText.headline(size: 17)),
-        content: Text(
-          'This removes your saved copy. You can save it again later if you still have the original download.',
-          style: AppText.body(size: 14),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Delete', style: TextStyle(color: AppColors.red)),
+    if (!mounted || _operationBusy) return;
+
+    setState(() => _operationBusy = true);
+
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            'Delete "${document.name}"?',
+            style: AppText.headline(size: 17),
           ),
-        ],
+          content: Text(
+            'This removes your saved copy. You can save it '
+            'again later if you still have the original download.',
+            style: AppText.body(size: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(true),
+              child: Text(
+                'Delete',
+                style: TextStyle(color: AppColors.red),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted || confirmed != true) return;
+
+      await _repo.delete(document.id);
+
+      _snack('Document removed from My Documents.');
+    } catch (error) {
+      debugPrint('Document deletion failed: $error');
+
+      _snack(
+        'Could not remove this document. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _operationBusy = false);
+      }
+    }
+  }
+
+  Widget _buildLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 40,
+              color: AppColors.steel,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _loadError!,
+              textAlign: TextAlign.center,
+              style: AppText.body(size: 14),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _operationBusy
+                  ? null
+                  : _loadDocuments,
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
       ),
     );
-    if (confirmed == true) {
-      await SavedDocumentsRepository.instance.delete(document.id);
-      if (mounted) setState(() {});
-    }
   }
 
   @override
@@ -65,7 +215,15 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
         title: Text('My Documents', style: AppText.headline(size: 18)),
         iconTheme: const IconThemeData(color: AppColors.ink),
       ),
-      body: documents.isEmpty
+      body: _loading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.amberDeep,
+              ),
+            )
+          : _loadError != null
+              ? _buildLoadError()
+              : documents.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -91,7 +249,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               itemBuilder: (context, index) {
                 final document = documents[index];
                 return InkWell(
-                  onTap: () => _open(document),
+                  onTap: _operationBusy ? null : () => _open(document),
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -119,7 +277,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                         IconButton(
                           icon: Icon(Icons.delete_outline,
                               color: AppColors.steel),
-                          onPressed: () => _confirmDelete(document),
+                          onPressed: _operationBusy ? null : () => _confirmDelete(document),
                         ),
                       ],
                     ),

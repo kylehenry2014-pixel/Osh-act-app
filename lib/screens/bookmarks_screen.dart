@@ -25,6 +25,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
       builder: (_) => DetailScreen(entries: list, initialId: entry.id),
     ));
     // Refresh in case a bookmark was removed from within the detail screen.
+    if (!mounted) return;
     setState(() {});
   }
 

@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/translation.dart';
@@ -30,36 +32,185 @@ class TranslationsRepository {
   String _currentLanguage = 'en';
   bool _loaded = false;
 
+  Future<void>? _loading;
+  Future<void> _languageQueue = Future<void>.value();
+
+  bool _preferencesReloadRequired = false;
+
+  bool _isSupportedLanguage(String code) {
+    return kSupportedLanguages.any(
+      (language) =>
+          language.code == code && language.available,
+    );
+  }
+
   String get currentLanguage => _currentLanguage;
 
-  Future<void> load() async {
-    if (_loaded) return;
-    final prefs = await SharedPreferences.getInstance();
-    _currentLanguage = prefs.getString(_languageKey) ?? 'en';
+  Future<void> load() {
+    if (_loaded) return Future<void>.value();
+
+    return _loading ??=
+        _loadOnce().whenComplete(() => _loading = null);
+  }
+
+  Future<void> _loadOnce() async {
+    var preferredLanguage = 'en';
+
+    // Invalid preferences must not prevent access
+    // to the original English legislation.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      if (_preferencesReloadRequired) {
+        await prefs.reload();
+        _preferencesReloadRequired = false;
+      }
+
+      final stored = prefs.get(_languageKey);
+
+      if (stored is String &&
+          _isSupportedLanguage(stored)) {
+        preferredLanguage = stored;
+      } else if (stored != null) {
+        debugPrint(
+          'Unsupported language preference. Using English.',
+        );
+      }
+    } catch (_) {
+      _preferencesReloadRequired = true;
+
+      debugPrint(
+        'Language preferences unavailable. Using English.',
+      );
+    }
+
+    final translations =
+        <String, Map<String, EntryTranslation>>{};
 
     for (final lang in kSupportedLanguages) {
-      if (lang.code == 'en') continue;
+      if (lang.code == 'en' || !lang.available) {
+        continue;
+      }
+
       try {
-        final raw = await rootBundle.loadString('assets/data/translations_${lang.code}.json');
-        final List<dynamic> jsonList = json.decode(raw) as List<dynamic>;
-        final map = <String, EntryTranslation>{};
-        for (final item in jsonList) {
-          final t = EntryTranslation.fromJson(item as Map<String, dynamic>);
-          map[t.entryId] = t;
+        final raw = await rootBundle.loadString(
+          'assets/data/translations_${lang.code}.json',
+        );
+
+        final decoded = jsonDecode(raw);
+
+        if (decoded is! List) {
+          throw const FormatException(
+            'Invalid translation catalogue.',
+          );
         }
-        _byLanguage[lang.code] = map;
+
+        final map = <String, EntryTranslation>{};
+
+        for (final item in decoded) {
+          if (item is! Map<String, dynamic>) {
+            throw const FormatException(
+              'Invalid translation record.',
+            );
+          }
+
+          final translation =
+              EntryTranslation.fromJson(item);
+
+          if (translation.entryId.trim().isEmpty) {
+            throw const FormatException(
+              'Missing translation entry ID.',
+            );
+          }
+
+          if (map.containsKey(translation.entryId)) {
+            throw const FormatException(
+              'Duplicate translation entry ID.',
+            );
+          }
+
+          map[translation.entryId] = translation;
+        }
+
+        translations[lang.code] = map;
       } catch (_) {
-        // No translation file yet for this language - falls back to English everywhere.
-        _byLanguage[lang.code] = {};
+        // Do not publish a partially damaged catalogue.
+        // Original English content remains available.
+        translations[lang.code] = {};
+
+        debugPrint(
+          'Translation catalogue unavailable: ${lang.code}',
+        );
       }
     }
+
+    _byLanguage
+      ..clear()
+      ..addAll(translations);
+
+    _currentLanguage = preferredLanguage;
     _loaded = true;
   }
 
-  Future<void> setLanguage(String code) async {
-    _currentLanguage = code;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_languageKey, code);
+  Future<void> setLanguage(String code) {
+    final operation = _languageQueue.then((_) async {
+      await load();
+
+      if (!_isSupportedLanguage(code)) {
+        throw ArgumentError('Unsupported language.');
+      }
+
+      if (code != 'en' &&
+          (_byLanguage[code]?.isEmpty ?? true)) {
+        throw StateError(
+          'This translation is currently unavailable.',
+        );
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+
+      if (_preferencesReloadRequired) {
+        await prefs.reload();
+        _preferencesReloadRequired = false;
+      }
+
+      try {
+        final saved = await prefs.setString(
+          _languageKey,
+          code,
+        );
+
+        if (!saved) {
+          throw StateError(
+            'Could not save the language preference.',
+          );
+        }
+      } catch (_) {
+        _preferencesReloadRequired = true;
+
+        try {
+          await prefs.reload();
+          _preferencesReloadRequired = false;
+        } catch (_) {
+          debugPrint(
+            'Language preference reload failed.',
+          );
+        }
+
+        rethrow;
+      }
+
+      // Change the active language only after
+      // the preference write reports success.
+      _currentLanguage = code;
+    });
+
+    _languageQueue = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+
+    return operation;
   }
 
   /// Returns the translation for [entryId] in the current language, or

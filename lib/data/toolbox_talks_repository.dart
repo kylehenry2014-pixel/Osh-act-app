@@ -17,18 +17,61 @@ class ToolboxTalksRepository {
   List<ToolboxTalkEntry> get all => List.unmodifiable(_all);
   List<String> get categories => List.unmodifiable(_categories);
 
-  Future<void> load() async {
-    final raw =
-        await rootBundle.loadString('assets/toolbox_talks_index_v2.json');
-    final list = jsonDecode(raw) as List;
-    _all = list
-        .map((e) => ToolboxTalkEntry.fromJson(e as Map<String, dynamic>))
-        .toList();
-    final catSet = <String>{};
-    for (final entry in _all) {
-      catSet.add(entry.category);
+  bool _catalogueLoaded = false;
+  Future<void>? _catalogueLoading;
+
+  Future<void> load() {
+    if (_catalogueLoaded) {
+      return Future<void>.value();
     }
-    _categories = catSet.toList()..sort();
+
+    return _catalogueLoading ??=
+        _loadCatalogue().whenComplete(
+          () => _catalogueLoading = null,
+        );
+  }
+
+  Future<void> _loadCatalogue() async {
+    final raw = await rootBundle.loadString(
+      'assets/toolbox_talks_index_v2.json',
+    );
+
+    final decoded = jsonDecode(raw);
+
+    if (decoded is! List || decoded.isEmpty) {
+      throw const FormatException(
+        'Toolbox Talks catalogue is invalid or empty.',
+      );
+    }
+
+    final entries = <ToolboxTalkEntry>[];
+    final categories = <String>{};
+
+    for (final item in decoded) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Invalid Toolbox Talk record.',
+        );
+      }
+
+      final entry = ToolboxTalkEntry.fromJson(item);
+
+      if (entry.title.trim().isEmpty ||
+          entry.category.trim().isEmpty) {
+        throw const FormatException(
+          'Incomplete Toolbox Talk record.',
+        );
+      }
+
+      entries.add(entry);
+      categories.add(entry.category);
+    }
+
+    final sortedCategories = categories.toList()..sort();
+
+    _all = entries;
+    _categories = sortedCategories;
+    _catalogueLoaded = true;
   }
 
   /// Returns entries matching [query] (case-insensitive, checked against

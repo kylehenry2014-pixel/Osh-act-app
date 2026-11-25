@@ -1,5 +1,9 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+
+// =====================================================
+// OHS ACT & REGULATIONS
+// PREMIUM INDUSTRIAL SPLASH SCREEN
+// =====================================================
 
 class OhsSplash extends StatefulWidget {
   const OhsSplash({
@@ -13,17 +17,45 @@ class OhsSplash extends StatefulWidget {
   State<OhsSplash> createState() => _OhsSplashState();
 }
 
+class _SplashStyle {
+  static const ink = Color(0xFF1B1E19);
+  static const gold = Color(0xFFDA9B2A);
+  static const lightGold = Color(0xFFFFE4A0);
+  static const cream = Color(0xFFF7F3E6);
+
+  static const background = RadialGradient(
+    center: Alignment(0, -0.2),
+    radius: 0.95,
+    colors: [
+      Color(0xFF393A2C),
+      Color(0xFF1B1E19),
+      Color(0xFF10120F),
+    ],
+    stops: [0, 0.55, 1],
+  );
+
+  static const metallicGold = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF805014),
+      Color(0xFFFFE4A0),
+      Color(0xFFD6A044),
+      Color(0xFF805014),
+      Color(0xFFFFD77A),
+    ],
+    stops: [0, 0.23, 0.48, 0.76, 1],
+  );
+}
+
 class _OhsSplashState extends State<OhsSplash>
     with SingleTickerProviderStateMixin {
-  static const Color _amber = Color(0xFFDA9B2A);
-  static const Color _ink = Color(0xFF1B1E19);
-  static const Color _plate = Color(0xFFF7F3E6);
-  static const Color _steel = Color(0xFF48595D);
-
   late final AnimationController _controller;
+  late final Animation<double> _exitOpacity;
 
-  bool _reducedMotion = false;
+  bool _started = false;
   bool _finished = false;
+  bool _reducedMotion = false;
 
   @override
   void initState() {
@@ -31,8 +63,24 @@ class _OhsSplashState extends State<OhsSplash>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3350),
+      duration: const Duration(milliseconds: 1800),
     );
+
+    _exitOpacity = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: ConstantTween<double>(1),
+        weight: 1500,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 1,
+          end: 0,
+        ).chain(
+          CurveTween(curve: Curves.easeInOut),
+        ),
+        weight: 300,
+      ),
+    ]).animate(_controller);
 
     _controller.addStatusListener(_onStatusChanged);
   }
@@ -41,39 +89,40 @@ class _OhsSplashState extends State<OhsSplash>
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final bool reduced =
+    _reducedMotion =
         MediaQuery.of(context).disableAnimations;
 
-    if (reduced != _reducedMotion ||
-        !_controller.isAnimating &&
-            _controller.value == 0.0) {
-      _reducedMotion = reduced;
+    if (!_started) {
+      _started = true;
 
-      if (_controller.value == 0.0) {
-        _controller.forward();
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        if (_reducedMotion) {
+          _finish();
+        } else {
+          _controller.forward();
+        }
+      });
+    } else if (_reducedMotion && !_finished) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _finish();
+      });
     }
   }
 
   void _onStatusChanged(AnimationStatus status) {
-    if (status == AnimationStatus.completed && !_finished) {
-      _finished = true;
-      widget.onFinished();
+    if (status == AnimationStatus.completed) {
+      _finish();
     }
   }
 
-  double _progress(
-    double startMs,
-    double endMs,
-    Curve curve,
-  ) {
-    final double currentMs = _controller.value * 3350.0;
+  void _finish() {
+    if (_finished || !mounted) return;
 
-    final double t = ((currentMs - startMs) /
-            (endMs - startMs))
-        .clamp(0.0, 1.0);
-
-    return curve.transform(t);
+    _finished = true;
+    _controller.stop();
+    widget.onFinished();
   }
 
   @override
@@ -85,115 +134,170 @@ class _OhsSplashState extends State<OhsSplash>
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        final double screenWidth = constraints.maxWidth;
+    return BlockSemantics(
+      child: AbsorbPointer(
+        child: FadeTransition(
+          opacity: _exitOpacity,
+          child: Material(
+            color: _SplashStyle.ink,
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: _SplashStyle.background,
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final height = constraints.maxHeight;
 
-        final double titleSize =
-            (screenWidth * 0.11).clamp(36.0, 120.0).toDouble();
+                  final cornerWidth =
+                      (width * 0.48)
+                          .clamp(100.0, 240.0)
+                          .toDouble();
 
-        final double subtitleSize =
-            (screenWidth * 0.07).clamp(23.0, 76.0).toDouble();
+                  final cornerHeight =
+                      cornerWidth * 0.64;
 
-        return AnimatedBuilder(
-          animation: _controller,
-          builder: (BuildContext context, Widget? child) {
-            final double currentMs =
-                _controller.value * 3350.0;
+                  final emblemSize =
+                      (width * 0.28)
+                          .clamp(76.0, 120.0)
+                          .toDouble();
 
-            final bool exiting = currentMs >= 3000.0;
-
-            final double stripeProgress = _reducedMotion
-                ? 1.0
-                : _progress(0.0, 3000.0, Curves.linear);
-
-            final double plateProgress = _reducedMotion
-                ? 1.0
-                : _progress(600.0, 1300.0, Curves.easeOut);
-
-            final double titleProgress = _reducedMotion
-                ? 1.0
-                : _progress(1100.0, 1700.0, Curves.ease);
-
-            final double subtitleProgress = _reducedMotion
-                ? 1.0
-                : _progress(1500.0, 2100.0, Curves.ease);
-
-            final double exitProgress =
-                _progress(3000.0, 3350.0, Curves.ease);
-
-            return IgnorePointer(
-              ignoring: exiting,
-              child: Opacity(
-                opacity: 1.0 - exitProgress,
-                child: SizedBox.expand(
-                  child: Stack(
-                    alignment: Alignment.center,
+                  return Stack(
+                    fit: StackFit.expand,
                     clipBehavior: Clip.hardEdge,
-                    children: <Widget>[
-                      const Positioned.fill(
-                        child: ColoredBox(color: _amber),
-                      ),
-
-                      Positioned.fill(
-                        child: ClipRect(
-                          child: OverflowBox(
-                            minWidth: constraints.maxWidth + 500.0,
-                            maxWidth: constraints.maxWidth + 500.0,
-                            minHeight: constraints.maxHeight + 500.0,
-                            maxHeight: constraints.maxHeight + 500.0,
-                            alignment: Alignment.center,
-                            child: Transform.translate(
-                              offset: Offset(
-                                160.0 * stripeProgress,
-                                0.0,
-                              ),
-                              child: CustomPaint(
-                                painter: const _HazardStripePainter(
-                                  ink: _ink,
-                                  amber: _amber,
-                                ),
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
+                    children: [
+                      // Top-left animated danger tape.
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        width: cornerWidth,
+                        height: cornerHeight,
+                        child: ClipPath(
+                          clipper:
+                              const _CornerClipper(),
+                          child: _MovingTape(
+                            animation: _controller,
+                            reducedMotion:
+                                _reducedMotion,
                           ),
                         ),
                       ),
 
-                      Center(
-                        child: Opacity(
-                          opacity: plateProgress,
-                          child: Transform.scale(
-                            scale: 0.85 + 0.15 * plateProgress,
-                            child: Container(
-                              width: screenWidth * 0.8333,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 50.0,
-                                horizontal: 8.0,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _plate,
-                                border: Border.all(
-                                  color: _ink,
-                                  width: 5.0,
-                                ),
-                                borderRadius:
-                                    BorderRadius.circular(16.0),
-                              ),
+                      // Bottom-right danger tape.
+                      // Moves in the opposite direction.
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        width: cornerWidth,
+                        height: cornerHeight,
+                        child: ClipPath(
+                          clipper: const _CornerClipper(
+                            bottomRight: true,
+                          ),
+                          child: _MovingTape(
+                            animation: _controller,
+                            reverse: true,
+                            reducedMotion:
+                                _reducedMotion,
+                          ),
+                        ),
+                      ),
+
+                      // Stationary branding.
+                      SafeArea(
+                        child: Align(
+                          alignment:
+                              const Alignment(0, -0.12),
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.all(24),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
                               child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  _AnimatedSplashText(
-                                    text: 'OHS Act',
-                                    fontSize: titleSize,
-                                    color: _ink,
-                                    progress: titleProgress,
+                                mainAxisSize:
+                                    MainAxisSize.min,
+                                children: [
+                                  _MetallicEmblem(
+                                    size: emblemSize,
+                                    animation:
+                                        _controller,
+                                    reducedMotion:
+                                        _reducedMotion,
                                   ),
-                                  _AnimatedSplashText(
-                                    text: '& Regulations',
-                                    fontSize: subtitleSize,
-                                    color: _steel,
-                                    progress: subtitleProgress,
+
+                                  const SizedBox(
+                                    height: 28,
+                                  ),
+
+                                  const Text(
+                                    'OHS Act',
+                                    textAlign:
+                                        TextAlign.center,
+                                    style: TextStyle(
+                                      color:
+                                          _SplashStyle.cream,
+                                      fontSize: 39,
+                                      fontWeight:
+                                          FontWeight.w800,
+                                      letterSpacing: 1.2,
+                                      height: 1.1,
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height: 6,
+                                  ),
+
+                                  const Text(
+                                    '& Regulations',
+                                    textAlign:
+                                        TextAlign.center,
+                                    style: TextStyle(
+                                      color:
+                                          _SplashStyle.gold,
+                                      fontSize: 27,
+                                      fontWeight:
+                                          FontWeight.w600,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height: 22,
+                                  ),
+
+                                  Container(
+                                    width: 110,
+                                    height: 1,
+                                    decoration:
+                                        const BoxDecoration(
+                                      gradient:
+                                          LinearGradient(
+                                        colors: [
+                                          Colors.transparent,
+                                          _SplashStyle.gold,
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height: 20,
+                                  ),
+
+                                  const Text(
+                                    'YOUR SAFETY COMPANION',
+                                    textAlign:
+                                        TextAlign.center,
+                                    style: TextStyle(
+                                      color:
+                                          Color(0xFFBCB9AC),
+                                      fontSize: 10,
+                                      fontWeight:
+                                          FontWeight.w500,
+                                      letterSpacing: 2.5,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -201,53 +305,30 @@ class _OhsSplashState extends State<OhsSplash>
                           ),
                         ),
                       ),
+
+                      // Decorative loading animation.
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: (height * 0.12)
+                            .clamp(24.0, 100.0)
+                            .toDouble(),
+                        child: SafeArea(
+                          top: false,
+                          child: Center(
+                            child: _SplashLoader(
+                              animation: _controller,
+                              reducedMotion:
+                                  _reducedMotion,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
-                  ),
-                ),
+                  );
+                },
               ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _AnimatedSplashText extends StatelessWidget {
-  const _AnimatedSplashText({
-    required this.text,
-    required this.fontSize,
-    required this.color,
-    required this.progress,
-  });
-
-  final String text;
-  final double fontSize;
-  final Color color;
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: progress,
-      child: Transform.translate(
-        offset: Offset(
-          0.0,
-          12.0 * (1.0 - progress),
-        ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          softWrap: false,
-          textScaler: TextScaler.noScaling,
-          style: TextStyle(
-            fontFamily: 'Georgia',
-            fontFamilyFallback: const <String>[
-              'serif',
-            ],
-            fontWeight: FontWeight.w700,
-            fontSize: fontSize,
-            color: color,
+            ),
           ),
         ),
       ),
@@ -255,50 +336,172 @@ class _AnimatedSplashText extends StatelessWidget {
   }
 }
 
-class _HazardStripePainter extends CustomPainter {
-  const _HazardStripePainter({
-    required this.ink,
-    required this.amber,
+// =====================================================
+// STATIONARY METALLIC EMBLEM
+// ANIMATED DANGER TAPE INSIDE
+// =====================================================
+
+class _MetallicEmblem extends StatelessWidget {
+  final double size;
+  final Animation<double> animation;
+  final bool reducedMotion;
+
+  const _MetallicEmblem({
+    required this.size,
+    required this.animation,
+    required this.reducedMotion,
   });
 
-  final Color ink;
-  final Color amber;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        gradient: _SplashStyle.metallicGold,
+        borderRadius: BorderRadius.circular(23),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33DA9B2A),
+            blurRadius: 25,
+          ),
+          BoxShadow(
+            color: Color(0x88000000),
+            blurRadius: 14,
+            offset: Offset(0, 7),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _MovingTape(
+              animation: animation,
+              reducedMotion: reducedMotion,
+            ),
 
-  static const double _bandWidth = 80.0;
-  static const double _period = 160.0;
+            // Fixed glossy reflection.
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0x44FFFFFF),
+                    Colors.transparent,
+                    Color(0x33000000),
+                  ],
+                  stops: [0, 0.45, 1],
+                ),
+              ),
+            ),
+
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0x66FFE4A0),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================
+// MOVING DANGER TAPE
+// =====================================================
+
+class _MovingTape extends StatelessWidget {
+  final Animation<double> animation;
+  final bool reverse;
+  final bool reducedMotion;
+
+  const _MovingTape({
+    required this.animation,
+    this.reverse = false,
+    this.reducedMotion = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _SmoothTapePainter(
+          animation: animation,
+          reverse: reverse,
+          reducedMotion: reducedMotion,
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _SmoothTapePainter extends CustomPainter {
+  final Animation<double> animation;
+  final bool reverse;
+  final bool reducedMotion;
+
+  _SmoothTapePainter({
+    required this.animation,
+    required this.reverse,
+    required this.reducedMotion,
+  }) : super(
+          repaint: reducedMotion ? null : animation,
+        );
+
+  static const double bandWidth = 20;
+  static const double period = bandWidth * 2;
+
+  final Paint _darkPaint = Paint()
+    ..color = _SplashStyle.ink;
+
+  final Paint _goldPaint = Paint()
+    ..color = const Color(0xFFDCA02E);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint amberPaint = Paint()
-      ..color = amber
-      ..style = PaintingStyle.fill;
+    final rect = Offset.zero & size;
 
-    final Paint inkPaint = Paint()
-      ..color = ink
-      ..style = PaintingStyle.fill;
+    canvas.save();
+    canvas.clipRect(rect);
 
-    canvas.drawRect(
-      Offset.zero & size,
-      amberPaint,
-    );
+    canvas.drawRect(rect, _darkPaint);
 
-    final double diagonal = math.sqrt(2.0);
+    // Linear motion at approximately 13.33 pixels
+    // per second. No reset or direction reversal.
+    final elapsedSeconds = animation.value * 1.8;
 
-    final double horizontalBand = _bandWidth * diagonal;
-    final double horizontalPeriod = _period * diagonal;
+    final distance = reducedMotion
+        ? 0.0
+        : elapsedSeconds * (period / 3.0);
 
-    final double start = -size.height - horizontalPeriod;
-    final double end =
-        size.width + size.height + horizontalPeriod;
+    final shift =
+        reverse ? -distance : distance;
 
-    for (double x = start;
-        x < end;
-        x += horizontalPeriod) {
-      final Path stripe = Path()
-        ..moveTo(x, 0.0)
-        ..lineTo(x + horizontalBand, 0.0)
+    final start =
+        -size.height - period * 2 + shift;
+
+    final end =
+        size.width + size.height + period * 2;
+
+    for (
+      double x = start;
+      x < end;
+      x += period
+    ) {
+      final stripe = Path()
+        ..moveTo(x, 0)
+        ..lineTo(x + bandWidth, 0)
         ..lineTo(
-          x + horizontalBand - size.height,
+          x + bandWidth - size.height,
           size.height,
         )
         ..lineTo(
@@ -307,30 +510,149 @@ class _HazardStripePainter extends CustomPainter {
         )
         ..close();
 
-      canvas.drawPath(stripe, inkPaint);
+      canvas.drawPath(stripe, _goldPaint);
     }
+
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _HazardStripePainter oldDelegate) {
-    return oldDelegate.ink != ink ||
-        oldDelegate.amber != amber;
+  bool shouldRepaint(
+    covariant _SmoothTapePainter oldDelegate,
+  ) {
+    return oldDelegate.animation != animation ||
+        oldDelegate.reverse != reverse ||
+        oldDelegate.reducedMotion != reducedMotion;
   }
 }
 
-/*
-Parent usage example:
+// =====================================================
+// DIAGONAL CORNER CLIPPING
+// =====================================================
 
-bool showSplash = true;
+class _CornerClipper extends CustomClipper<Path> {
+  final bool bottomRight;
 
-Stack(
-  children: [
-    HomeScreen(),
-    if (showSplash)
-      OhsSplash(
-        onFinished: () =>
-            setState(() => showSplash = false),
+  const _CornerClipper({
+    this.bottomRight = false,
+  });
+
+  @override
+  Path getClip(Size size) {
+    if (bottomRight) {
+      return Path()
+        ..moveTo(size.width, 0)
+        ..lineTo(size.width, size.height)
+        ..lineTo(0, size.height)
+        ..close();
+    }
+
+    return Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(
+    covariant _CornerClipper oldClipper,
+  ) => oldClipper.bottomRight != bottomRight;
+}
+
+// =====================================================
+// SMOOTH GOLD LOADING INDICATOR
+// =====================================================
+
+class _SplashLoader extends StatelessWidget {
+  final Animation<double> animation;
+  final bool reducedMotion;
+
+  const _SplashLoader({
+    required this.animation,
+    required this.reducedMotion,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: SizedBox(
+        width: 145,
+        height: 4,
+        child: CustomPaint(
+          painter: _LoaderPainter(
+            animation: animation,
+            reducedMotion: reducedMotion,
+          ),
+        ),
       ),
-  ],
-)
-*/
+    );
+  }
+}
+
+class _LoaderPainter extends CustomPainter {
+  final Animation<double> animation;
+  final bool reducedMotion;
+
+  _LoaderPainter({
+    required this.animation,
+    required this.reducedMotion,
+  }) : super(
+          repaint: reducedMotion ? null : animation,
+        );
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    final track = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(4),
+    );
+
+    canvas.drawRRect(
+      track,
+      Paint()..color = const Color(0x18FFFFFF),
+    );
+
+    canvas.save();
+    canvas.clipRRect(track);
+
+    const double segmentWidth = 48;
+
+    final x = reducedMotion
+        ? (size.width - segmentWidth) / 2
+        : -segmentWidth +
+            animation.value *
+                (size.width + segmentWidth);
+
+    final segment = Rect.fromLTWH(
+      x,
+      0,
+      segmentWidth,
+      size.height,
+    );
+
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        colors: [
+          Colors.transparent,
+          _SplashStyle.lightGold,
+          _SplashStyle.gold,
+          Colors.transparent,
+        ],
+        stops: [0, 0.4, 0.6, 1],
+      ).createShader(segment);
+
+    canvas.drawRect(segment, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant _LoaderPainter oldDelegate,
+  ) {
+    return oldDelegate.animation != animation ||
+        oldDelegate.reducedMotion != reducedMotion;
+  }
+}

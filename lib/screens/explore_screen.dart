@@ -21,6 +21,8 @@ class ExploreScreenState extends State<ExploreScreen> {
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
 
+  static bool _openingEntry = false;
+
   String? _browseCategory;
   String? _browseCollection;
 
@@ -34,6 +36,7 @@ class ExploreScreenState extends State<ExploreScreen> {
   /// Called by the Home tab when tapped while already active, to jump
   /// back to the top-level category cards.
   void resetToTop() {
+    if (!mounted) return;
     setState(() {
       _browseCategory = null;
       _browseCollection = null;
@@ -47,6 +50,7 @@ class ExploreScreenState extends State<ExploreScreen> {
   /// handled the back press, false if already at the top level (meaning
   /// the caller should fall through to normal exit/tab-switch behaviour).
   bool handleBack() {
+    if (!mounted) return false;
     if (_browseCollection != null) {
       setState(() => _browseCollection = null);
       return true;
@@ -78,32 +82,80 @@ class ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Future<void> _openEntry(Entry entry, List<Entry> pagingList) async {
-    if (!SubscriptionRepository.instance.isPro) {
-      final adCount =
-          await AdService.instance.nextRequiredAdCount(_sectionOpenFeatureKey);
-      if (!mounted) return;
-      final confirmed = await _confirmWatchAd();
-      if (confirmed != true) return;
+  Future<void> _openEntry(
+    Entry entry,
+    List<Entry> pagingList,
+  ) async {
+    if (!mounted || _openingEntry) return;
 
-      final earned = await AdService.instance.watchAds(adCount);
-      if (!mounted) return;
-      if (!earned) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                "You'll need to watch the ad through to the end to open this section."),
-          ),
+    _openingEntry = true;
+
+    final entries = List<Entry>.unmodifiable(pagingList);
+
+    try {
+      if (!SubscriptionRepository.instance.isPro) {
+        final adCount = await AdService.instance
+            .nextRequiredAdCount(_sectionOpenFeatureKey);
+
+        if (!mounted) return;
+
+        final confirmed = await _confirmWatchAd();
+
+        if (!mounted || confirmed != true) return;
+
+        final earned =
+            await AdService.instance.watchAds(adCount);
+
+        if (!mounted) return;
+
+        if (!earned) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            const SnackBar(
+              content: Text(
+                "You'll need to watch the ad through "
+                "to the end to open this section.",
+              ),
+            ),
+          );
+
+          return;
+        }
+
+        await AdService.instance.recordUnlockedRequest(
+          _sectionOpenFeatureKey,
         );
+
+        if (!mounted) return;
+      }
+
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
         return;
       }
-      await AdService.instance.recordUnlockedRequest(_sectionOpenFeatureKey);
-      if (!mounted) return;
-    }
 
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => DetailScreen(entries: pagingList, initialId: entry.id),
-    ));
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetailScreen(
+            entries: entries,
+            initialId: entry.id,
+          ),
+        ),
+      );
+    } catch (error) {
+      debugPrint('Unable to open legislation: $error');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to open this section. Please try again.',
+          ),
+        ),
+      );
+    } finally {
+      _openingEntry = false;
+    }
   }
 
   void _onSearchChanged(String q) {
@@ -113,7 +165,7 @@ class ExploreScreenState extends State<ExploreScreen> {
       return;
     }
     final jump = _repo.tryCodeJump(trimmed);
-    if (jump != null) {
+    if (jump != null && !_openingEntry) {
       _searchController.clear();
       _searchFocus.unfocus();
       final scoped = _repo.entriesInCollection(jump.collection);

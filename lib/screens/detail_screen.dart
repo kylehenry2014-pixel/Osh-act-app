@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../data/bookmarks_repository.dart';
@@ -34,7 +36,41 @@ class _DetailScreenState extends State<DetailScreen> {
   bool _notesOpen = false;
 
   final FlutterTts _tts = FlutterTts();
+
   bool _isSpeaking = false;
+  bool _bookmarkBusy = false;
+  bool _disposed = false;
+
+  int _speechRevision = 0;
+
+  Future<void> _speechQueue = Future<void>.value();
+
+  bool _speechIsCurrent(int revision) {
+    return mounted &&
+        !_disposed &&
+        revision == _speechRevision;
+  }
+
+  Future<void> _enqueueSpeech(
+    Future<void> Function() operation,
+  ) {
+    final next = _speechQueue.then((_) async {
+      try {
+        await operation();
+      } catch (error) {
+        debugPrint('Text-to-speech operation failed: $error');
+      }
+    });
+
+    _speechQueue = next;
+    return next;
+  }
+
+  void _speechFinished() {
+    if (!mounted || _disposed || !_isSpeaking) return;
+
+    setState(() => _isSpeaking = false);
+  }
 
   @override
   void initState() {
@@ -42,17 +78,28 @@ class _DetailScreenState extends State<DetailScreen> {
     _index = widget.entries.indexWhere((e) => e.id == widget.initialId);
     if (_index < 0) _index = 0;
     _noteController = TextEditingController(text: _bookmarks.noteFor(_entry.id) ?? '');
-    _tts.setCompletionHandler(() {
-      if (mounted) setState(() => _isSpeaking = false);
-    });
-    _tts.setCancelHandler(() {
-      if (mounted) setState(() => _isSpeaking = false);
+    _tts.setCompletionHandler(_speechFinished);
+    _tts.setCancelHandler(_speechFinished);
+
+    _tts.setErrorHandler((message) {
+      debugPrint('Text-to-speech error: $message');
+      _speechFinished();
     });
   }
 
   @override
   void dispose() {
-    _tts.stop();
+    _disposed = true;
+    _speechRevision++;
+
+    _tts.setCompletionHandler(() {});
+    _tts.setCancelHandler(() {});
+    _tts.setErrorHandler((_) {});
+
+    unawaited(_enqueueSpeech(() async {
+      await _tts.stop();
+    }));
+
     _noteController.dispose();
     super.dispose();
   }
@@ -69,29 +116,90 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _toggleSpeech() async {
+    if (!mounted || _disposed) return;
+
+    final revision = ++_speechRevision;
+
     if (_isSpeaking) {
-      await _tts.stop();
       setState(() => _isSpeaking = false);
+
+      await _enqueueSpeech(() async {
+        await _tts.stop();
+      });
+
       return;
     }
-    setState(() => _isSpeaking = true);
+
     final (title, body, _) = _displayText;
     final textToRead = '$title. $body';
+
     final lang = kSupportedLanguages.firstWhere(
       (l) => l.code == _translations.currentLanguage,
       orElse: () => kSupportedLanguages.first,
     );
-    final hasVoice = await _tts.isLanguageAvailable(lang.ttsLocale);
-    await _tts.setLanguage(hasVoice == true ? lang.ttsLocale : 'en-US');
-    await _tts.setPitch(1.0);
-    await _tts.setSpeechRate(0.48);
-    await _tts.speak(textToRead);
+
+    setState(() => _isSpeaking = true);
+
+    await _enqueueSpeech(() async {
+      if (!_speechIsCurrent(revision)) return;
+
+      try {
+        final hasVoice =
+            await _tts.isLanguageAvailable(lang.ttsLocale);
+
+        if (!_speechIsCurrent(revision)) return;
+
+        await _tts.setLanguage(
+          hasVoice == true ? lang.ttsLocale : 'en-US',
+        );
+
+        if (!_speechIsCurrent(revision)) return;
+
+        await _tts.setPitch(1.0);
+
+        if (!_speechIsCurrent(revision)) return;
+
+        await _tts.setSpeechRate(0.48);
+
+        if (!_speechIsCurrent(revision)) return;
+
+        final result = await _tts.speak(textToRead);
+
+        if (!_speechIsCurrent(revision)) {
+          await _tts.stop();
+          return;
+        }
+
+        if (result != 1) {
+          setState(() => _isSpeaking = false);
+        }
+      } catch (error) {
+        debugPrint('Unable to read legislation aloud: $error');
+
+        if (!_speechIsCurrent(revision)) return;
+
+        setState(() => _isSpeaking = false);
+
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to read this section aloud. Please try again.',
+            ),
+          ),
+        );
+      }
+    });
   }
 
   void _go(int delta) {
     final next = _index + delta;
     if (next < 0 || next >= widget.entries.length) return;
-    _tts.stop();
+    _speechRevision++;
+
+    unawaited(_enqueueSpeech(() async {
+      await _tts.stop();
+    }));
+
     setState(() {
       _index = next;
       _noteController.text = _bookmarks.noteFor(_entry.id) ?? '';
@@ -101,12 +209,42 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _toggleBookmark() async {
-    await _bookmarks.toggleBookmark(_entry.id);
-    setState(() {});
+    if (!mounted || _bookmarkBusy) return;
+
+    final entryId = _entry.id;
+    _bookmarkBusy = true;
+
+    try {
+      await _bookmarks.toggleBookmark(entryId);
+
+      if (!mounted) return;
+
+      setState(() {});
+    } catch (error) {
+      debugPrint('Bookmark update failed: $error');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('Unable to update bookmark. Please try again.'),
+        ),
+      );
+    } finally {
+      _bookmarkBusy = false;
+    }
   }
 
   Future<void> _saveNote(String value) async {
-    await _bookmarks.setNote(_entry.id, value);
+    if (!mounted || _disposed) return;
+
+    final entryId = _entry.id;
+
+    try {
+      await _bookmarks.setNote(entryId, value);
+    } catch (error) {
+      debugPrint('Unable to save legislation note: $error');
+    }
   }
 
   @override

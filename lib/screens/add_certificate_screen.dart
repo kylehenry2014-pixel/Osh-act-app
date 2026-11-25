@@ -26,6 +26,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
   List<String> _imagePaths = [];
   DateTime? _expiryDate;
   bool _saving = false;
+  bool _picking = false;
   String? _error;
 
   bool get _isEditing => widget.existing != null;
@@ -50,36 +51,95 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
   }
 
   Future<void> _takePhoto() async {
+    if (_saving || _picking) return;
+
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
+
     try {
-      final picked =
-          await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+      final picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+
+      if (!mounted) return;
+
       if (picked != null) {
-        setState(() => _imagePaths.add(picked.path));
+        setState(() {
+          if (!_imagePaths.contains(picked.path)) {
+            _imagePaths.add(picked.path);
+          }
+        });
       }
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
+
       setState(() => _error =
-          'Could not access the camera. Check app permissions in your device settings.');
+          'Could not access the camera. '
+          'Check your device permissions.');
+    } finally {
+      if (mounted) {
+        setState(() => _picking = false);
+      }
     }
   }
 
   Future<void> _uploadPhotos() async {
+    if (_saving || _picking) return;
+
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
+
     try {
-      // Multi-select so a whole stack of pages can be added in one go.
-      final picked = await _picker.pickMultiImage(imageQuality: 85);
+      final picked = await _picker.pickMultiImage(
+        imageQuality: 85,
+      );
+
+      if (!mounted) return;
+
       if (picked.isNotEmpty) {
-        setState(() => _imagePaths.addAll(picked.map((f) => f.path)));
+        setState(() {
+          for (final image in picked) {
+            if (!_imagePaths.contains(image.path)) {
+              _imagePaths.add(image.path);
+            }
+          }
+        });
       }
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
+
       setState(() => _error =
-          'Could not access photos. Check app permissions in your device settings.');
+          'Could not access photos. '
+          'Check your device permissions.');
+    } finally {
+      if (mounted) {
+        setState(() => _picking = false);
+      }
     }
   }
 
   void _removePage(int index) {
-    setState(() => _imagePaths.removeAt(index));
+    if (_saving || _picking) return;
+
+    if (index < 0 || index >= _imagePaths.length) {
+      return;
+    }
+
+    // Remove only from the temporary editing list.
+    // No permanent file is deleted here.
+    setState(() {
+      _imagePaths.removeAt(index);
+      _error = null;
+    });
   }
 
   Future<void> _pickExpiryDate() async {
+    if (_saving || _picking) return;
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -95,108 +155,130 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
         child: child!,
       ),
     );
-    if (picked != null) setState(() => _expiryDate = picked);
+    if (mounted && picked != null) setState(() => _expiryDate = picked);
   }
 
   Future<void> _save() async {
+    if (_saving || _picking) return;
+
     final name = _nameController.text.trim();
+    final notes = _notesController.text.trim();
+    final expiryDate = _expiryDate;
+    final selectedPaths = List<String>.of(_imagePaths);
+
     if (name.isEmpty) {
-      setState(() => _error = 'Please give this certificate a name.');
-      return;
-    }
-    if (_imagePaths.isEmpty) {
       setState(() => _error =
-          'Please take or choose at least one photo of the certificate.');
-      return;
-    }
-    if (_expiryDate == null) {
-      setState(() => _error = 'Please set an expiry date.');
+          'Please give this certificate a name.');
       return;
     }
 
-    // Shared daily download/add allowance (2/day free, 20/day Pro) -
-    // only applies to genuinely new certificates, not edits.
-    if (!_isEditing) {
-      try {
-        await DownloadAllowanceService.instance.checkAndConsume();
-      } on DownloadLimitException catch (e) {
-        setState(() => _error = e.message);
-        return;
-      }
+    if (selectedPaths.isEmpty) {
+      setState(() => _error =
+          'Please take or choose at least one photo.');
+      return;
     }
 
+    if (expiryDate == null) {
+      setState(() => _error =
+          'Please set an expiry date.');
+      return;
+    }
+
+    // Lock before the first asynchronous operation.
     setState(() {
       _saving = true;
       _error = null;
     });
 
+    FocusScope.of(context).unfocus();
+
+    bool saved = false;
+
     try {
-      await NotificationService.instance.requestPermissions();
+      // Validate selected files before using the allowance.
+      for (final path in selectedPaths) {
+        final file = File(path);
 
-      if (_isEditing) {
-        final existing = widget.existing!;
-        final keptExistingPaths =
-            _imagePaths.where((p) => existing.imagePaths.contains(p)).toList();
-        final removedPaths =
-            existing.imagePaths.where((p) => !_imagePaths.contains(p)).toList();
-        final newlyPickedPaths =
-            _imagePaths.where((p) => !existing.imagePaths.contains(p)).toList();
-
-        // Delete any pages the user removed during this edit.
-        for (final path in removedPaths) {
-          final file = File(path);
-          if (await file.exists()) {
-            try {
-              await file.delete();
-            } catch (_) {
-              // Non-fatal - an orphaned file is a minor storage cost.
-            }
-          }
+        if (!await file.exists() ||
+            await file.length() == 0) {
+          throw StateError(
+            'A selected photo is missing or empty. '
+            'Please remove or replace it.',
+          );
         }
+      }
 
-        // Copy any newly added pages into permanent app storage.
-        var finalImagePaths = keptExistingPaths;
-        if (newlyPickedPaths.isNotEmpty) {
-          final withNewPages = await CertificatesRepository.instance
-              .addPages(existing.id, newlyPickedPaths);
-          // addPages always appends new pages at the end of the *original*
-          // stored list (unaffected by any removals we handled above), so
-          // the newly copied paths are exactly the last N entries here.
-          final newlyCopiedPaths = withNewPages.imagePaths.sublist(
-              withNewPages.imagePaths.length - newlyPickedPaths.length);
-          finalImagePaths = [...keptExistingPaths, ...newlyCopiedPaths];
-        }
-
-        final updated = existing.copyWith(
-          name: name,
-          imagePaths: finalImagePaths,
-          expiryDate: _expiryDate!,
-          notes: _notesController.text.trim(),
-        );
-        await CertificatesRepository.instance.update(updated);
-      } else {
-        await CertificatesRepository.instance.add(
-          name: name,
-          sourceImagePaths: _imagePaths,
-          expiryDate: _expiryDate!,
-          notes: _notesController.text.trim().isEmpty
-              ? null
-              : _notesController.text.trim(),
+      // Notification permission failures must not
+      // prevent a customer from saving a certificate.
+      try {
+        await NotificationService.instance
+            .requestPermissions();
+      } catch (error) {
+        debugPrint(
+          'Certificate notification permission unavailable: $error',
         );
       }
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (e) {
-      setState(() => _error = 'Could not save this certificate: $e');
+
+      if (!mounted) return;
+
+      if (_isEditing) {
+        await CertificatesRepository.instance
+            .editCertificate(
+          certId: widget.existing!.id,
+          name: name,
+          selectedPaths: selectedPaths,
+          expiryDate: expiryDate,
+          notes: notes,
+        );
+      } else {
+        // The repository consumes the allowance after
+        // successfully preparing all certificate pages.
+        await CertificatesRepository.instance.add(
+          name: name,
+          sourceImagePaths: selectedPaths,
+          expiryDate: expiryDate,
+          notes: notes.isEmpty ? null : notes,
+        );
+      }
+
+      saved = true;
+    } on DownloadLimitException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } catch (error) {
+      debugPrint('Certificate save failed: $error');
+
+      if (mounted) {
+        setState(() => _error =
+            'Could not save this certificate. '
+            'Please check your selected photos and '
+            'available device storage, then try again.');
+      }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+
+    if (saved && mounted) {
+      Navigator.of(context).pop(true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_saving,
+      child: Scaffold(
       backgroundColor: AppColors.paper,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: BackButton(
+          onPressed: () {
+            if (!_saving) Navigator.of(context).maybePop();
+          },
+        ),
         backgroundColor: AppColors.paper,
         elevation: 0,
         title: Text(_isEditing ? 'Edit Certificate' : 'Add Certificate',
@@ -209,6 +291,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _PagesPicker(
+              enabled: !_saving && !_picking,
               imagePaths: _imagePaths,
               onCamera: _takePhoto,
               onGallery: _uploadPhotos,
@@ -220,6 +303,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
             const SizedBox(height: 6),
             TextField(
               controller: _nameController,
+              enabled: !_saving && !_picking,
               style: AppText.body(size: 15),
               decoration: _inputDecoration(
                   'e.g. Fire Equipment Service, Medical Certificate'),
@@ -229,7 +313,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                 style: AppText.label(size: 11, color: AppColors.steel)),
             const SizedBox(height: 6),
             InkWell(
-              onTap: _pickExpiryDate,
+              onTap: (_saving || _picking) ? null : _pickExpiryDate,
               child: Container(
                 width: double.infinity,
                 padding:
@@ -263,6 +347,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
             const SizedBox(height: 6),
             TextField(
               controller: _notesController,
+              enabled: !_saving && !_picking,
               style: AppText.body(size: 15),
               maxLines: 3,
               decoration: _inputDecoration(
@@ -277,7 +362,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _saving ? null : _save,
+                onPressed: (_saving || _picking) ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.amberDeep,
                   foregroundColor: Colors.white,
@@ -296,6 +381,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -321,12 +407,14 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
 
 class _PagesPicker extends StatelessWidget {
   final List<String> imagePaths;
+  final bool enabled;
   final VoidCallback onCamera;
   final VoidCallback onGallery;
   final void Function(int index) onRemove;
 
   const _PagesPicker({
     required this.imagePaths,
+    required this.enabled,
     required this.onCamera,
     required this.onGallery,
     required this.onRemove,
@@ -371,7 +459,7 @@ class _PagesPicker extends StatelessWidget {
               itemBuilder: (context, index) => _PageThumbnail(
                 imagePath: imagePaths[index],
                 pageNumber: index + 1,
-                onRemove: () => onRemove(index),
+                onRemove: enabled ? () => onRemove(index) : null,
               ),
             ),
           ),
@@ -380,7 +468,7 @@ class _PagesPicker extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: onCamera,
+                onPressed: enabled ? onCamera : null,
                 icon: const Icon(Icons.camera_alt_outlined, size: 18),
                 label: Text(imagePaths.isEmpty ? 'Take Photo' : 'Add Page'),
                 style: OutlinedButton.styleFrom(
@@ -395,7 +483,7 @@ class _PagesPicker extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: onGallery,
+                onPressed: enabled ? onGallery : null,
                 icon: const Icon(Icons.upload_outlined, size: 18),
                 label: const Text('Upload'),
                 style: OutlinedButton.styleFrom(
@@ -424,7 +512,7 @@ class _PagesPicker extends StatelessWidget {
 class _PageThumbnail extends StatelessWidget {
   final String imagePath;
   final int pageNumber;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
 
   const _PageThumbnail(
       {required this.imagePath,
@@ -439,8 +527,18 @@ class _PageThumbnail extends StatelessWidget {
           width: 90,
           height: 110,
           decoration: BoxDecoration(border: Border.all(color: AppColors.line)),
-          child: Image.file(File(imagePath),
-              fit: BoxFit.cover, width: 90, height: 110),
+          child: Image.file(
+            File(imagePath),
+            fit: BoxFit.cover,
+            width: 90,
+            height: 110,
+            errorBuilder: (_, __, ___) => const Center(
+              child: Icon(
+                Icons.broken_image_outlined,
+                color: AppColors.steel,
+              ),
+            ),
+          ),
         ),
         Positioned(
           left: 4,

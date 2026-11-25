@@ -13,9 +13,38 @@ class LanguageScreen extends StatefulWidget {
 class _LanguageScreenState extends State<LanguageScreen> {
   final _repo = TranslationsRepository.instance;
 
+  bool _changingLanguage = false;
+
   Future<void> _selectLanguage(String code) async {
-    await _repo.setLanguage(code);
-    setState(() {});
+    if (!mounted ||
+        _changingLanguage ||
+        _repo.currentLanguage == code) {
+      return;
+    }
+
+    setState(() => _changingLanguage = true);
+
+    try {
+      await _repo.setLanguage(code);
+    } catch (error) {
+      debugPrint('Language change failed: $error');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to change language. Please try again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _changingLanguage = false);
+      } else {
+        _changingLanguage = false;
+      }
+    }
   }
 
   @override
@@ -58,7 +87,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                   return Opacity(
                     opacity: lang.available ? 1 : 0.5,
                     child: InkWell(
-                      onTap: lang.available ? () => _selectLanguage(lang.code) : null,
+                      onTap: lang.available && !_changingLanguage ? () => _selectLanguage(lang.code) : null,
                       child: Container(
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         padding: const EdgeInsets.all(16),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/connectivity_service.dart';
 import '../data/ad_service.dart';
 import '../data/subscription_repository.dart';
 import '../theme/app_theme.dart';
@@ -17,6 +18,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _sending = false;
+  bool _retryPending = false;
+  bool _adSatisfied = false;
   String? _error;
   bool _errorIsQuota = false;
 
@@ -27,60 +30,176 @@ class _ChatScreenState extends State<ChatScreen> {
       "do steel work and occasional confined space inspections.";
 
   Future<void> _send() async {
+    if (!mounted || _sending || _retryPending) return;
+
     final text = _controller.text.trim();
-    if (text.isEmpty || _sending) return;
+    if (text.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
 
     setState(() {
-      _messages.add(ChatMessage(role: 'user', content: text));
+      _messages.add(
+        ChatMessage(role: 'user', content: text),
+      );
       _controller.clear();
+      _retryPending = true;
+      _adSatisfied = false;
+    });
+
+    await _requestReply();
+  }
+
+  Future<void> _retry() async {
+    if (!mounted || _sending || !_retryPending) return;
+
+    await _requestReply();
+  }
+
+  void _editPendingMessage() {
+    if (!mounted || _sending || !_retryPending) return;
+
+    if (_messages.isEmpty || !_messages.last.isUser) return;
+
+    setState(() {
+      final pending = _messages.removeLast();
+
+      _controller.text = pending.content;
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
+
+      _retryPending = false;
+      _adSatisfied = false;
+      _error = null;
+      _errorIsQuota = false;
+    });
+  }
+
+  Future<void> _requestReply() async {
+    if (!mounted || _sending || !_retryPending) return;
+
+    setState(() {
       _sending = true;
       _error = null;
       _errorIsQuota = false;
     });
+
     _scrollToBottom();
 
-    final isPro = SubscriptionRepository.instance.isPro;
+    final conversation = List<ChatMessage>.unmodifiable(
+      _messages,
+    );
 
     try {
-      final reply = await AdService.instance.runWithAd<String>(
-        isPro: isPro,
-        task: () => ChatRepository.instance.sendMessage(_messages),
-      );
+      if (ChatRepository.instance.isBusy) {
+        throw const ChatException(
+          'A response is already being processed. '
+          'Please wait a moment.',
+        );
+      }
+
+      final online = await ConnectivityService.instance
+          .isOnline()
+          .timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      if (!online) {
+        throw const ChatException(
+          'No internet connection. '
+          'Reconnect and retry your question.',
+        );
+      }
+
+      final isPro = SubscriptionRepository.instance.isPro;
+
+      Future<String> requestAnswer() async {
+        if (!mounted) {
+          throw const ChatException(
+            'The conversation was closed.',
+          );
+        }
+
+        if (!isPro) {
+          _adSatisfied = true;
+        }
+
+        return ChatRepository.instance.sendMessage(
+          conversation,
+        );
+      }
+
+      final String? reply;
+
+      if (isPro || _adSatisfied) {
+        reply = await requestAnswer();
+      } else {
+        reply = await AdService.instance.runWithAd<String>(
+          isPro: false,
+          task: requestAnswer,
+        );
+      }
 
       if (!mounted) return;
 
       if (reply == null) {
-        // Free user: ad wasn't watched through to completion.
         setState(() {
-          _sending = false;
           _error =
-              "You'll need to watch the ad through to the end to get your answer. Please try again.";
+              'Watch the advertisement through to the end '
+              'to receive your answer. You can retry below.';
         });
-        _scrollToBottom();
+
         return;
       }
 
       setState(() {
-        _sending = false;
-        _messages.add(ChatMessage(role: 'assistant', content: reply));
+        _messages.add(
+          ChatMessage(role: 'assistant', content: reply),
+        );
+
+        _retryPending = false;
+        _adSatisfied = false;
       });
-      _scrollToBottom();
-    } on ChatException catch (e) {
+    } on ChatException catch (error) {
       if (!mounted) return;
+
       setState(() {
-        _sending = false;
-        _error = e.message;
-        _errorIsQuota = e.isQuotaExceeded;
+        _error = error.message;
+        _errorIsQuota = error.isQuotaExceeded;
       });
-      _scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+
+      debugPrint('Safety Chat Bot request failed.');
+
+      setState(() {
+        _error =
+            'Could not complete your question. '
+            'Check your connection and try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+        _scrollToBottom();
+      }
     }
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (!mounted || !_scrollController.hasClients) return;
+
+      final position = _scrollController.position;
+
+      if (!position.hasContentDimensions) return;
+
+      final target = position.maxScrollExtent;
+
+      if (MediaQuery.of(context).disableAnimations) {
+        _scrollController.jumpTo(target);
+      } else {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          target,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
@@ -153,10 +272,33 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
+          if (_retryPending && !_sending)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _editPendingMessage,
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit question'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _errorIsQuota ? null : _retry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _InputBar(
             controller: _controller,
             onSend: _send,
-            enabled: !_sending,
+            enabled: !_sending && !_retryPending,
             sending: _sending,
           ),
         ],

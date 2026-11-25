@@ -20,7 +20,43 @@ class SubscriptionRepository {
   static const Set<String> productIds = {monthlyProductId};
 
   final ValueNotifier<bool> isProNotifier = ValueNotifier<bool>(false);
-  bool get isPro => isProNotifier.value;
+  DateTime? _entitlementExpiry;
+  Timer? _expiryTimer;
+
+  bool get isPro =>
+      isProNotifier.value &&
+      (_entitlementExpiry?.isAfter(DateTime.now()) ?? false);
+
+  void _clearEntitlement() {
+    _expiryTimer?.cancel();
+    _expiryTimer = null;
+    _entitlementExpiry = null;
+    isProNotifier.value = false;
+  }
+
+  void _applyEntitlement(Map<String, dynamic>? data) {
+    _expiryTimer?.cancel();
+
+    if (!_isActiveEntitlement(data)) {
+      _clearEntitlement();
+      return;
+    }
+
+    final expiry = (data!['expiresAt'] as Timestamp).toDate();
+
+    _entitlementExpiry = expiry;
+
+    final remaining = expiry.difference(DateTime.now());
+
+    if (remaining <= Duration.zero) {
+      _clearEntitlement();
+      return;
+    }
+
+    isProNotifier.value = true;
+
+    _expiryTimer = Timer(remaining, _clearEntitlement);
+  }
 
   FirebaseAuth get _auth => FirebaseAuth.instance;
   FirebaseFunctions get _functions => FirebaseFunctions.instance;
@@ -37,25 +73,42 @@ class SubscriptionRepository {
   }
 
   Future<void> init() async {
+    try {
+      await _purchaseSub?.cancel();
+
+      _purchaseSub = _iap.purchaseStream.listen(
+        _onPurchaseUpdate,
+        onError: (Object error) {
+          debugPrint('Purchase stream error: $error');
+        },
+      );
+    } catch (error) {
+      debugPrint('Purchase listener error: $error');
+    }
+
     if (Firebase.apps.isEmpty) return;
+
     try {
       await _ensureSignedIn();
       final uid = _auth.currentUser!.uid;
 
-      _entitlementSub?.cancel();
+      await _entitlementSub?.cancel();
+      _clearEntitlement();
+
       _entitlementSub = _firestore
           .collection('subscriptions')
           .doc(uid)
           .snapshots()
           .listen((doc) {
-        isProNotifier.value = _isActiveEntitlement(doc.data());
+        _applyEntitlement(doc.data());
+      }, onError: (Object error) {
+        _clearEntitlement();
+        debugPrint('Subscription entitlement unavailable.');
       });
 
-      _purchaseSub?.cancel();
-      _purchaseSub =
-          _iap.purchaseStream.listen(_onPurchaseUpdate, onError: (_) {});
+
     } catch (_) {
-      // Leave isProNotifier at its safe default (false) on any failure.
+      _clearEntitlement();
     }
   }
 
@@ -63,10 +116,12 @@ class SubscriptionRepository {
     if (data == null) return false;
     if (data['isActive'] != true) return false;
     final expiresAt = data['expiresAt'];
-    if (expiresAt is Timestamp && expiresAt.toDate().isBefore(DateTime.now())) {
-      return false;
-    }
-    return true;
+
+    // Missing or invalid expiry information must never
+    // grant a paid entitlement.
+    if (expiresAt is! Timestamp) return false;
+
+    return expiresAt.toDate().isAfter(DateTime.now());
   }
 
   /// A short, human-readable reason for the last empty product query. Only
@@ -85,18 +140,15 @@ class SubscriptionRepository {
     lastQueryDiagnostic = null;
     var stage = 'connecting to Play billing';
     try {
-      if (Firebase.apps.isEmpty) {
-        lastQueryDiagnostic = 'Firebase is not initialised.';
-        return [];
-      }
-      final available = await _iap.isAvailable().timeout(const Duration(seconds: 20));
+
+      final available = await _iap.isAvailable().timeout(const Duration(seconds: 15));
       if (!available) {
         lastQueryDiagnostic =
             'Google Play Billing is not available. Is the app installed from Google Play, and is the Play Store up to date?';
         return [];
       }
       stage = 'loading the product from Play';
-      final response = await _iap.queryProductDetails(productIds).timeout(const Duration(seconds: 20));
+      final response = await _iap.queryProductDetails(productIds).timeout(const Duration(seconds: 45));
       final error = response.error;
       if (error != null) {
         lastQueryDiagnostic =
@@ -116,8 +168,20 @@ class SubscriptionRepository {
   }
 
   Future<void> buy(ProductDetails product) async {
+    if (Firebase.apps.isEmpty) {
+      throw StateError('Purchase verification is unavailable.');
+    }
+
+    await _ensureSignedIn().timeout(const Duration(seconds: 20));
+
     final purchaseParam = PurchaseParam(productDetails: product);
-    await _iap.buyNonConsumable(purchaseParam: purchaseParam);
+    final launched = await _iap.buyNonConsumable(
+      purchaseParam: purchaseParam,
+    );
+
+    if (!launched) {
+      throw StateError('Google Play could not start the purchase.');
+    }
   }
 
   Future<void> restorePurchases() async {
@@ -133,7 +197,7 @@ class SubscriptionRepository {
         if (verified && purchase.pendingCompletePurchase) {
           await _iap.completePurchase(purchase);
         }
-      } else if (purchase.pendingCompletePurchase) {
+      } else if ((purchase.status == PurchaseStatus.error || purchase.status == PurchaseStatus.canceled) && purchase.pendingCompletePurchase) {
         // Error or canceled purchases must still be completed.
         await _iap.completePurchase(purchase);
       }
@@ -142,6 +206,10 @@ class SubscriptionRepository {
 
   Future<bool> _verifyAndGrant(PurchaseDetails purchase) async {
     try {
+      if (Firebase.apps.isEmpty) return false;
+
+      await _ensureSignedIn().timeout(const Duration(seconds: 20));
+
       final callable = _functions.httpsCallable('verifyPurchase');
       await callable.call<Map<String, dynamic>>({
         'productId': purchase.productID,
@@ -157,6 +225,7 @@ class SubscriptionRepository {
   }
 
   void dispose() {
+    _clearEntitlement();
     _entitlementSub?.cancel();
     _purchaseSub?.cancel();
   }

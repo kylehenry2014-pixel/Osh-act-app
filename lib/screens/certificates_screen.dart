@@ -21,7 +21,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const AddCertificateScreen()),
     );
-    if (saved == true) setState(() {});
+    if (mounted && saved == true) setState(() {});
   }
 
   Future<void> _openDetail(Certificate cert) async {
@@ -29,7 +29,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
       MaterialPageRoute(
           builder: (_) => _CertificateDetailScreen(certificate: cert)),
     );
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   @override
@@ -130,7 +130,7 @@ class _CertificateCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(2),
                   child: Image.file(
-                    File(certificate.imagePaths.first),
+                    File(certificate.imagePaths.isEmpty ? '' : certificate.imagePaths.first),
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
@@ -228,6 +228,8 @@ class _CertificateDetailScreen extends StatefulWidget {
 class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
   late Certificate _certificate;
   int _pageIndex = 0;
+  bool _deleting = false;
+  bool _editing = false;
 
   @override
   void initState() {
@@ -236,14 +238,40 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
   }
 
   Future<void> _edit() async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-          builder: (_) => AddCertificateScreen(existing: _certificate)),
-    );
-    if (mounted) Navigator.of(context).pop();
+    if (_deleting || _editing) return;
+
+    setState(() => _editing = true);
+
+    try {
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => AddCertificateScreen(
+            existing: _certificate,
+          ),
+        ),
+      );
+
+      if (!mounted || saved != true) return;
+
+      for (final certificate
+          in CertificatesRepository.instance.all) {
+        if (certificate.id == _certificate.id) {
+          setState(() {
+            _certificate = certificate;
+            _pageIndex = 0;
+          });
+          break;
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _editing = false);
+      }
+    }
   }
 
   Future<void> _confirmDelete() async {
+    if (_deleting || _editing) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -263,9 +291,39 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
         ],
       ),
     );
-    if (confirmed == true) {
-      await CertificatesRepository.instance.delete(_certificate.id);
-      if (mounted) Navigator.of(context).pop();
+    if (!mounted || confirmed != true || _deleting) {
+      return;
+    }
+
+    setState(() => _deleting = true);
+
+    bool deleted = false;
+
+    try {
+      await CertificatesRepository.instance
+          .delete(_certificate.id);
+
+      deleted = true;
+    } catch (error) {
+      debugPrint('Certificate deletion failed: $error');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not delete the certificate. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _deleting = false);
+      }
+    }
+
+    if (deleted && mounted) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -282,10 +340,10 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
         title: Text(cert.name, style: AppText.headline(size: 17)),
         iconTheme: const IconThemeData(color: AppColors.ink),
         actions: [
-          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: _edit),
+          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: (_deleting || _editing) ? null : _edit),
           IconButton(
               icon: const Icon(Icons.delete_outline),
-              onPressed: _confirmDelete),
+              onPressed: (_deleting || _editing) ? null : _confirmDelete),
         ],
       ),
       body: SingleChildScrollView(
@@ -300,8 +358,23 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
             ],
             ClipRRect(
               borderRadius: BorderRadius.circular(2),
-              child: Image.file(File(pages[_pageIndex]),
-                  width: double.infinity, fit: BoxFit.contain),
+              child: pages.isEmpty
+                  ? const Center(
+                      child: Text('No certificate photos available.'),
+                    )
+                  : Image.file(
+                      File(pages[_pageIndex]),
+                      width: double.infinity,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(
+                          child: Text(
+                            'This certificate photo is unavailable.',
+                          ),
+                        ),
+                      ),
+                    ),
             ),
             if (pages.length > 1) ...[
               const SizedBox(height: 10),
@@ -323,7 +396,7 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
                           width: index == _pageIndex ? 2 : 1,
                         ),
                       ),
-                      child: Image.file(File(pages[index]), fit: BoxFit.cover),
+                      child: Image.file(File(pages[index]), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                     ),
                   ),
                 ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../data/entries_repository.dart';
@@ -20,27 +22,88 @@ class _IsoScreenState extends State<IsoScreen> {
   IsoClause? _openClause;
 
   final FlutterTts _tts = FlutterTts();
+
   bool _isSpeaking = false;
+  bool _disposed = false;
+  bool _openingRelated = false;
+
+  int _speechRevision = 0;
+
+  Future<void> _speechQueue = Future<void>.value();
+
+  bool _speechIsCurrent(int revision) {
+    return mounted &&
+        !_disposed &&
+        revision == _speechRevision;
+  }
+
+  Future<void> _enqueueSpeech(
+    Future<void> Function() operation,
+  ) {
+    final next = _speechQueue.then((_) async {
+      try {
+        await operation();
+      } catch (error) {
+        debugPrint('ISO speech operation failed: $error');
+      }
+    });
+
+    _speechQueue = next;
+    return next;
+  }
+
+  void _speechFinished() {
+    if (!mounted || _disposed || !_isSpeaking) return;
+
+    setState(() => _isSpeaking = false);
+  }
+
+  Future<void> _stopSpeech() {
+    _speechRevision++;
+
+    if (mounted && !_disposed && _isSpeaking) {
+      setState(() => _isSpeaking = false);
+    }
+
+    return _enqueueSpeech(() async {
+      await _tts.stop();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _tts.setCompletionHandler(() {
-      if (mounted) setState(() => _isSpeaking = false);
-    });
-    _tts.setCancelHandler(() {
-      if (mounted) setState(() => _isSpeaking = false);
+
+    _tts.setCompletionHandler(_speechFinished);
+    _tts.setCancelHandler(_speechFinished);
+
+    _tts.setErrorHandler((message) {
+      debugPrint('ISO text-to-speech error: $message');
+      _speechFinished();
     });
   }
 
   @override
   void dispose() {
-    _tts.stop();
+    _disposed = true;
+    _speechRevision++;
+
+    _tts.setCompletionHandler(() {});
+    _tts.setCancelHandler(() {});
+    _tts.setErrorHandler((_) {});
+
+    unawaited(_enqueueSpeech(() async {
+      await _tts.stop();
+    }));
+
     super.dispose();
   }
 
   void _openStandard(String id, String name) {
-    _tts.stop();
+    if (!mounted) return;
+
+    unawaited(_stopSpeech());
+
     setState(() {
       _standardId = id;
       _standardName = name;
@@ -50,7 +113,10 @@ class _IsoScreenState extends State<IsoScreen> {
   }
 
   void _back() {
-    _tts.stop();
+    if (!mounted) return;
+
+    unawaited(_stopSpeech());
+
     setState(() {
       if (_openClause != null) {
         _openClause = null;
@@ -58,39 +124,134 @@ class _IsoScreenState extends State<IsoScreen> {
         _standardId = null;
         _standardName = null;
       }
+
       _isSpeaking = false;
     });
   }
 
   Future<void> _toggleSpeech() async {
+    if (!mounted || _disposed || _openingRelated) return;
+
     final clause = _openClause;
+
     if (clause == null) return;
+
     if (_isSpeaking) {
-      await _tts.stop();
-      setState(() => _isSpeaking = false);
+      await _stopSpeech();
       return;
     }
-    setState(() => _isSpeaking = true);
-    final textToRead = '${clause.title}. ${clause.explanation} '
+
+    final revision = ++_speechRevision;
+
+    final textToRead =
+        '${clause.title}. ${clause.explanation} '
         '${clause.practicalPoints.join('. ')}';
+
     final lang = kSupportedLanguages.firstWhere(
-      (l) => l.code == TranslationsRepository.instance.currentLanguage,
+      (l) => l.code ==
+          TranslationsRepository.instance.currentLanguage,
       orElse: () => kSupportedLanguages.first,
     );
-    final hasVoice = await _tts.isLanguageAvailable(lang.ttsLocale);
-    await _tts.setLanguage(hasVoice == true ? lang.ttsLocale : 'en-US');
-    await _tts.setPitch(1.0);
-    await _tts.setSpeechRate(0.48);
-    await _tts.speak(textToRead);
+
+    setState(() => _isSpeaking = true);
+
+    await _enqueueSpeech(() async {
+      if (!_speechIsCurrent(revision)) return;
+
+      try {
+        final hasVoice =
+            await _tts.isLanguageAvailable(lang.ttsLocale);
+
+        if (!_speechIsCurrent(revision)) return;
+
+        await _tts.setLanguage(
+          hasVoice == true ? lang.ttsLocale : 'en-US',
+        );
+
+        if (!_speechIsCurrent(revision)) return;
+
+        await _tts.setPitch(1.0);
+
+        if (!_speechIsCurrent(revision)) return;
+
+        await _tts.setSpeechRate(0.48);
+
+        if (!_speechIsCurrent(revision)) return;
+
+        final result = await _tts.speak(textToRead);
+
+        if (!_speechIsCurrent(revision)) {
+          await _tts.stop();
+          return;
+        }
+
+        if (result != 1) {
+          setState(() => _isSpeaking = false);
+        }
+      } catch (error) {
+        debugPrint('Unable to read ISO clause: $error');
+
+        if (!_speechIsCurrent(revision)) return;
+
+        setState(() => _isSpeaking = false);
+
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to read this clause aloud. Please try again.',
+            ),
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _openRelatedReg(String regId) async {
+    if (!mounted || _openingRelated) return;
+
     final entry = EntriesRepository.instance.byId(regId);
+
     if (entry == null) return;
-    final scoped = EntriesRepository.instance.entriesInCollection(entry.collection);
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => DetailScreen(entries: scoped, initialId: entry.id),
-    ));
+
+    final scoped = EntriesRepository.instance
+        .entriesInCollection(entry.collection);
+
+    final originalClause = _openClause;
+
+    _openingRelated = true;
+
+    try {
+      await _stopSpeech();
+
+      if (!mounted ||
+          _openClause != originalClause ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetailScreen(
+            entries: scoped,
+            initialId: entry.id,
+          ),
+        ),
+      );
+    } catch (error) {
+      debugPrint('Unable to open related regulation: $error');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to open the related regulation.',
+          ),
+        ),
+      );
+    } finally {
+      _openingRelated = false;
+    }
   }
 
   @override

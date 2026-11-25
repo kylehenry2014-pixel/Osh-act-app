@@ -1,5 +1,8 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -37,6 +40,42 @@ class DailyCitationService {
 
   final _plugin = FlutterLocalNotificationsPlugin();
 
+  static const _scheduleKey = 'daily_citation_schedule_v2';
+
+  Future<void> _citationQueue = Future<void>.value();
+
+  Future<T> _serialise<T>(Future<T> Function() task) {
+    final operation = _citationQueue.then((_) => task());
+
+    _citationQueue = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+
+    return operation;
+  }
+
+  Future<void> _prepareNotifications() async {
+    await NotificationService.instance.init();
+
+    final zone = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(zone));
+  }
+
+  Future<void> _checkWrite(
+    SharedPreferences prefs,
+    Future<bool> write,
+  ) async {
+    try {
+      if (!await write) {
+        throw StateError('Could not save citation settings.');
+      }
+    } catch (_) {
+      await prefs.reload();
+      rethrow;
+    }
+  }
+
   /// The Acts the user can pick from: the OHS Act, the OHS Regulations as
   /// one group, and every other Act found in the data.
   List<CitationSource> availableSources() {
@@ -53,40 +92,86 @@ class DailyCitationService {
 
   Future<bool> isEnabled() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_enabledKey) ?? false;
+    final stored = prefs.get(_enabledKey);
+
+    if (stored == null) return false;
+
+    if (stored is! bool) {
+      throw const FormatException(
+        'Invalid daily citation preference.',
+      );
+    }
+
+    return stored;
   }
 
-  /// The chosen sources. Everything is selected until the user changes it.
   Future<Set<String>> selectedSources() async {
     final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getStringList(_sourcesKey);
+    final stored = prefs.get(_sourcesKey);
     final valid = availableSources().map((s) => s.key).toSet();
+
     if (stored == null) return valid;
-    final chosen = stored.where((k) => valid.contains(k)).toSet();
-    return chosen.isEmpty ? valid : chosen;
+
+    if (stored is! List ||
+        stored.any((value) => value is! String)) {
+      throw const FormatException(
+        'Invalid daily citation sources.',
+      );
+    }
+
+    final chosen = stored.whereType<String>()
+        .where(valid.contains)
+        .toSet();
+
+    if (chosen.isEmpty) {
+      throw StateError(
+        'Select at least one available legislation source.',
+      );
+    }
+
+    return chosen;
   }
 
-  Future<void> setSelectedSources(Set<String> keys) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_sourcesKey, keys.toList());
-    await refresh();
+  Future<void> setSelectedSources(Set<String> keys) {
+    final requested = Set<String>.from(keys);
+
+    return _serialise(() async {
+      final valid = availableSources().map((s) => s.key).toSet();
+
+      if (requested.isEmpty ||
+          !requested.every(valid.contains)) {
+        throw ArgumentError('Invalid citation source selection.');
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final sorted = requested.toList()..sort();
+
+      await _checkWrite(
+        prefs,
+        prefs.setStringList(_sourcesKey, sorted),
+      );
+
+      await _refreshOnce();
+    });
   }
 
-  /// Turns the daily citation on or off. Returns the resulting state: false
-  /// if the user asked for it on but notification permission was refused.
-  Future<bool> setEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (enabled) {
-      final granted = await _requestPermission();
-      if (!granted) {
-        await prefs.setBool(_enabledKey, false);
-        await refresh();
+  Future<bool> setEnabled(bool enabled) {
+    return _serialise(() async {
+      if (enabled && !await _requestPermission()) {
         return false;
       }
-    }
-    await prefs.setBool(_enabledKey, enabled);
-    await refresh();
-    return enabled;
+
+      final prefs = await SharedPreferences.getInstance();
+
+      await _checkWrite(
+        prefs,
+        prefs.setBool(_enabledKey, enabled),
+      );
+
+      await _refreshOnce();
+
+      return enabled;
+    });
   }
 
   Future<bool> _requestPermission() async {
@@ -110,70 +195,155 @@ class DailyCitationService {
   /// Clears the old schedule and, if the feature is on, schedules the next
   /// 30 daily citations. Safe to call as often as needed; on the same day it
   /// produces the same picks, so opening the app does not change them.
-  Future<void> refresh() async {
-    try {
-      await NotificationService.instance.init();
-      await _cancelAll();
-      if (!await isEnabled()) return;
-
-      final repo = EntriesRepository.instance;
-      if (!repo.isLoaded) await repo.load();
-      final pool = await _pool();
-      if (pool.isEmpty) return;
-
-      final now = DateTime.now();
-      final rng = Random(now.year * 10000 + now.month * 100 + now.day);
-      final order = List<Entry>.from(pool)..shuffle(rng);
-
-      var scheduled = 0;
-      var index = 0;
-      for (var d = 0; d <= _daysAhead && scheduled < _daysAhead; d++) {
-        final when = DateTime(now.year, now.month, now.day + d, _sendHour);
-        if (!when.isAfter(now)) continue;
-        final entry = order[index % order.length];
-        index++;
-        await _plugin.zonedSchedule(
-          _baseId + scheduled,
-          _title(entry),
-          _snippet(entry, 140),
-          tz.TZDateTime.from(when, tz.local),
-          _details(entry),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-        scheduled++;
-      }
-    } catch (_) {
-      // Notifications are a convenience - never let a failure here affect the app.
-    }
+  Future<void> refresh() {
+    return _serialise(_refreshOnce);
   }
 
-  /// Shows one citation immediately so the user can see how it looks.
-  Future<bool> sendTest() async {
-    try {
-      if (!await _requestPermission()) return false;
-      final repo = EntriesRepository.instance;
-      if (!repo.isLoaded) await repo.load();
-      final pool = await _pool();
-      if (pool.isEmpty) return false;
-      final entry = pool[Random().nextInt(pool.length)];
-      await _plugin.show(
-        _baseId + _slots,
+  Future<void> _refreshOnce() async {
+    await NotificationService.instance.init();
+
+    final prefs = await SharedPreferences.getInstance();
+
+    final pending = await _plugin.pendingNotificationRequests();
+
+    final existingIds = pending
+        .map((request) => request.id)
+        .where((id) => id >= _baseId && id < _baseId + _slots)
+        .toSet();
+
+    if (!await isEnabled()) {
+      for (final id in existingIds) {
+        await _plugin.cancel(id);
+      }
+
+      await _checkWrite(prefs, prefs.remove(_scheduleKey));
+      return;
+    }
+
+    await _prepareNotifications();
+
+    final repo = EntriesRepository.instance;
+    if (!repo.isLoaded) await repo.load();
+
+    final keys = await selectedSources();
+    final pool = await _pool();
+
+    if (pool.isEmpty) {
+      throw StateError('No citations available for the selected sources.');
+    }
+
+    final now = tz.TZDateTime.now(tz.local);
+
+    final sortedKeys = keys.toList()..sort();
+
+    final firstDay = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      _sendHour,
+    );
+
+    final startDay = firstDay.isAfter(now)
+        ? firstDay
+        : tz.TZDateTime(
+            tz.local,
+            now.year,
+            now.month,
+            now.day + 1,
+            _sendHour,
+          );
+
+    final fingerprint = [
+      'v2',
+      tz.local.name,
+      startDay.toIso8601String(),
+      pool.length.toString(),
+      ...sortedKeys,
+    ].join('|');
+
+    final desiredIds = <int>{
+      for (var i = 0; i < _daysAhead; i++) _baseId + i,
+    };
+
+    if (prefs.get(_scheduleKey) == fingerprint &&
+        existingIds.length == desiredIds.length &&
+        existingIds.containsAll(desiredIds)) {
+      return;
+    }
+
+    // Invalidate the previous schedule marker before changing
+    // notifications so an interrupted refresh can be retried.
+    await _checkWrite(prefs, prefs.remove(_scheduleKey));
+
+    for (var d = 0; d < _daysAhead; d++) {
+      final when = tz.TZDateTime(
+        tz.local,
+        startDay.year,
+        startDay.month,
+        startDay.day + d,
+        _sendHour,
+      );
+
+      final seed = when.year * 10000 +
+          when.month * 100 +
+          when.day;
+
+      final entry = pool[Random(seed).nextInt(pool.length)];
+
+      // Reuse the reserved ID instead of cancelling
+      // the entire existing schedule before rebuilding it.
+      await _plugin.zonedSchedule(
+        _baseId + d,
         _title(entry),
         _snippet(entry, 140),
+        when,
         _details(entry),
+        androidScheduleMode:
+            AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
-      return true;
-    } catch (_) {
-      return false;
     }
+
+    for (final id in existingIds.difference(desiredIds)) {
+      await _plugin.cancel(id);
+    }
+
+    await _checkWrite(
+      prefs,
+      prefs.setString(_scheduleKey, fingerprint),
+    );
+
+    debugPrint('Daily citation schedule refreshed.');
   }
 
-  Future<void> _cancelAll() async {
-    for (var i = 0; i < _slots; i++) {
-      await _plugin.cancel(_baseId + i);
-    }
+  Future<bool> sendTest() {
+    return _serialise(() async {
+      try {
+        if (!await _requestPermission()) return false;
+
+        final repo = EntriesRepository.instance;
+        if (!repo.isLoaded) await repo.load();
+
+        final pool = await _pool();
+        if (pool.isEmpty) return false;
+
+        final entry = pool[Random().nextInt(pool.length)];
+
+        await _plugin.show(
+          _baseId + _slots,
+          _title(entry),
+          _snippet(entry, 140),
+          _details(entry),
+        );
+
+        return true;
+      } catch (error) {
+        debugPrint('Citation test notification failed: $error');
+        return false;
+      }
+    });
   }
 
   Future<List<Entry>> _pool() async {

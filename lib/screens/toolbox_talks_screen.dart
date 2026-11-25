@@ -15,11 +15,42 @@ import '../widgets/animated_download_button.dart';
 Future<String> _extractAssetToTemp(String assetPath, String fileName) async {
   final data = await rootBundle.load(assetPath);
   final tempDir = await getTemporaryDirectory();
-  final file = File('${tempDir.path}/$fileName');
-  await file.writeAsBytes(
-    data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-  );
-  return file.path;
+  final folder = await tempDir.createTemp('ohs_talk_');
+
+  try {
+    final safeName = fileName
+        .replaceAll(RegExp(r'[^A-Za-z0-9._ -]'), '_');
+
+    final name = safeName.isEmpty ||
+            safeName == '.' ||
+            safeName == '..'
+        ? 'toolbox_talk.docx'
+        : safeName;
+
+    final file = File('${folder.path}/$name');
+
+    await file.writeAsBytes(
+      data.buffer.asUint8List(
+        data.offsetInBytes,
+        data.lengthInBytes,
+      ),
+      flush: true,
+    );
+
+    if (await file.length() == 0) {
+      throw StateError('The toolbox talk is empty.');
+    }
+
+    return file.path;
+  } catch (error) {
+    try {
+      await folder.delete(recursive: true);
+    } catch (cleanupError) {
+      debugPrint('Toolbox cleanup failed: $cleanupError');
+    }
+
+    rethrow;
+  }
 }
 
 class ToolboxTalksScreen extends StatefulWidget {
@@ -308,10 +339,36 @@ class _TalkDetailSheet extends StatelessWidget {
   final ToolboxTalkEntry entry;
   const _TalkDetailSheet({required this.entry});
 
+  static bool _documentBusy = false;
+
   static const _openFeatureKey = 'toolbox_talk_open';
   static const _saveFeatureKey = 'toolbox_talk_save';
 
   Future<void> _openTalk(BuildContext context) async {
+    if (!context.mounted || _documentBusy) return;
+
+    _documentBusy = true;
+
+    try {
+      await _performOpenTalk(context);
+    } catch (error) {
+      debugPrint('Toolbox talk opening failed: $error');
+
+      if (context.mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not open this toolbox talk. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _documentBusy = false;
+    }
+  }
+
+  Future<void> _performOpenTalk(BuildContext context) async {
     if (!SubscriptionRepository.instance.isPro) {
       final adCount =
           await AdService.instance.nextRequiredAdCount(_openFeatureKey);
@@ -337,7 +394,7 @@ class _TalkDetailSheet extends StatelessWidget {
           ],
         ),
       );
-      if (confirmed != true) return;
+      if (!context.mounted || confirmed != true) return;
 
       final earned = await AdService.instance.watchAds(adCount);
       if (!context.mounted) return;
@@ -357,8 +414,22 @@ class _TalkDetailSheet extends StatelessWidget {
       if (!context.mounted) return;
     }
 
-    final path = await _extractAssetToTemp(entry.assetPath, entry.fileName);
+    final path = await _extractAssetToTemp(
+      entry.assetPath,
+      entry.fileName,
+    );
+
+    if (!context.mounted ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      await _cleanupTalkFile(path);
+      return;
+    }
+
     final result = await OpenFile.open(path);
+
+    if (result.type != ResultType.done) {
+      await _cleanupTalkFile(path);
+    }
     if (context.mounted && result.type != ResultType.done) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -367,29 +438,57 @@ class _TalkDetailSheet extends StatelessWidget {
     }
   }
 
-  Future<void> _saveTalk(BuildContext context) async {
-    // Shared daily download allowance (2/day free, 20/day Pro) - checked
-    // first so we don't make a free user watch an ad only to find out
-    // they were already over their daily download limit.
+  Future<void> _cleanupTalkFile(String path) async {
     try {
-      await DownloadAllowanceService.instance.checkAndConsume();
-    } on DownloadLimitException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+      final folder = File(path).parent;
+
+      if (folder.uri.pathSegments.any(
+        (part) => part.startsWith('ohs_talk_'),
+      )) {
+        await folder.delete(recursive: true);
       }
-      return;
+    } catch (error) {
+      debugPrint('Toolbox temporary cleanup failed: $error');
+    }
+  }
+
+  void _showMessage(BuildContext context, String message) {
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _saveTalk(BuildContext context) async {
+    if (!context.mounted || _documentBusy) {
+      throw StateError('Another document operation is active.');
     }
 
+    _documentBusy = true;
+
+    String? temporaryPath;
+
     try {
+      // Prepare the document and complete the required ad
+      // before consuming a download allowance.
+
+      if (!context.mounted) {
+        throw const _TalkSaveCancelled();
+      }
+
       if (!SubscriptionRepository.instance.isPro) {
-        final adCount =
-            await AdService.instance.nextRequiredAdCount(_saveFeatureKey);
-        if (!context.mounted) return;
+        final adCount = await AdService.instance
+            .nextRequiredAdCount(_saveFeatureKey);
+
+        if (!context.mounted ||
+            ModalRoute.of(context)?.isCurrent != true) {
+          throw const _TalkSaveCancelled();
+        }
+
         final confirmed = await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: const Text('Watch an ad to continue'),
             content: Text(
               adCount == 1
@@ -398,47 +497,114 @@ class _TalkDetailSheet extends StatelessWidget {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(false),
                 child: const Text('Cancel'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(true),
                 child: const Text('Watch'),
               ),
             ],
           ),
         );
-        if (confirmed != true) return;
 
-        final earned = await AdService.instance.watchAds(adCount);
-        if (!context.mounted) return;
-        if (!earned) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                adCount == 1
-                    ? "You'll need to watch the ad through to the end to unlock this."
-                    : "You'll need to watch all $adCount ads through to the end to unlock this.",
-              ),
-            ),
-          );
-          return;
+        if (!context.mounted || confirmed != true) {
+          throw const _TalkSaveCancelled();
         }
-        await AdService.instance.recordUnlockedRequest(_saveFeatureKey);
-        if (!context.mounted) return;
+
+        final earned =
+            await AdService.instance.watchAds(adCount);
+
+        if (!context.mounted) {
+          throw const _TalkSaveCancelled();
+        }
+
+        if (!earned) {
+          _showMessage(
+            context,
+            'Complete the required ads to save this document.',
+          );
+
+          throw const _TalkSaveCancelled();
+        }
+
+        await AdService.instance
+            .recordUnlockedRequest(_saveFeatureKey);
       }
 
-      final path = await _extractAssetToTemp(entry.assetPath, entry.fileName);
-      await FlutterFileDialog.saveFile(
-        params: SaveFileDialogParams(sourceFilePath: path),
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save this talk: $e')),
-        );
+      if (!context.mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        throw const _TalkSaveCancelled();
       }
+
+      temporaryPath = await _extractAssetToTemp(
+        entry.assetPath,
+        entry.fileName,
+      );
+
+      if (!context.mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        throw const _TalkSaveCancelled();
+      }
+
+      final preparedFile = File(temporaryPath);
+
+      if (!await preparedFile.exists() ||
+          await preparedFile.length() == 0) {
+        throw StateError('The prepared document is unavailable.');
+      }
+
+      if (!context.mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        throw const _TalkSaveCancelled();
+      }
+
+      // The document and advertisement requirements are complete.
+      await DownloadAllowanceService.instance.checkAndConsume();
+
+      if (!context.mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        throw const _TalkSaveCancelled();
+      }
+
+      final savedPath = await FlutterFileDialog.saveFile(
+        params: SaveFileDialogParams(
+          sourceFilePath: temporaryPath,
+        ),
+      );
+
+      if (savedPath == null || savedPath.isEmpty) {
+        _showMessage(
+          context,
+          'Save cancelled. Your download allowance was already used.',
+        );
+        throw const _TalkSaveCancelled();
+      }
+
+      _showMessage(context, 'Toolbox talk saved successfully.');
+    } on _TalkSaveCancelled {
+      // Reset the animated button without reporting success.
       rethrow;
+    } on DownloadLimitException catch (error) {
+      _showMessage(context, error.message);
+      rethrow;
+    } catch (error) {
+      debugPrint('Toolbox talk save failed: $error');
+
+      _showMessage(
+        context,
+        'Could not save this talk. Please try again.',
+      );
+
+      rethrow;
+    } finally {
+      if (temporaryPath != null) {
+        await _cleanupTalkFile(temporaryPath);
+      }
+
+      _documentBusy = false;
     }
   }
 
@@ -485,4 +651,12 @@ class _TalkDetailSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class _TalkSaveCancelled implements Exception {
+  const _TalkSaveCancelled();
+
+  @override
+  String toString() => 'Toolbox talk save cancelled.';
 }

@@ -24,6 +24,11 @@ class SdsScreen extends StatefulWidget {
 class _SdsScreenState extends State<SdsScreen> {
   final _controller = TextEditingController();
   bool _searching = false;
+  bool _savingSds = false;
+  bool _openingBrowser = false;
+
+  bool get _busy =>
+      _searching || _savingSds || _openingBrowser;
   SdsResult? _result;
   String? _error;
   bool _errorIsQuota = false;
@@ -34,139 +39,448 @@ class _SdsScreenState extends State<SdsScreen> {
     super.dispose();
   }
 
-  Future<void> _runSearch(Future<SdsResult> Function() search) async {
-    final isPro = SubscriptionRepository.instance.isPro;
+  void _showError(
+    String message, {
+    bool isQuota = false,
+  }) {
+    if (!mounted) return;
+
+    setState(() {
+      _error = message;
+      _errorIsQuota = isQuota;
+    });
+  }
+
+  void _showNotice(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  bool _beginSearch() {
+    if (!mounted || _busy) return false;
+
+    if (SdsRepository.instance.isBusy) {
+      _showError(
+        'An SDS search is already running. '
+        'Please wait for it to finish.',
+      );
+      return false;
+    }
+
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _searching = true;
       _error = null;
       _errorIsQuota = false;
-      _result = null;
     });
 
-    try {
-      final result = await AdService.instance.runWithAd<SdsResult>(
-        isPro: isPro,
-        task: search,
+    return true;
+  }
+
+  Future<bool> _checkConnection() async {
+    final online = await ConnectivityService.instance
+        .isOnline()
+        .timeout(const Duration(seconds: 10));
+
+    if (!mounted) return false;
+
+    if (!online) {
+      _showError(
+        'You need an internet connection '
+        'to search for an SDS.',
       );
-
-      if (!mounted) return;
-
-      if (result == null) {
-        setState(() {
-          _searching = false;
-          _error =
-              "You'll need to watch the ad through to the end to see this result. Please try again.";
-        });
-        return;
-      }
-
-      setState(() {
-        _searching = false;
-        _result = result;
-      });
-    } on SdsException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _searching = false;
-        _error = e.message;
-        _errorIsQuota = e.isQuotaExceeded;
-      });
     }
+
+    return online;
+  }
+
+  Future<void> _runSearch(
+    Future<SdsResult> Function() search,
+  ) async {
+    if (!mounted) return;
+
+    final isPro =
+        SubscriptionRepository.instance.isPro;
+
+    setState(() {
+      _result = null;
+      _error = null;
+      _errorIsQuota = false;
+    });
+
+    final result =
+        await AdService.instance.runWithAd<SdsResult>(
+      isPro: isPro,
+      task: search,
+    );
+
+    if (!mounted) return;
+
+    if (result == null) {
+      _showError(
+        "You'll need to watch the ad through "
+        'to the end to see this result. '
+        'Please try again.',
+      );
+      return;
+    }
+
+    setState(() {
+      _result = result;
+    });
   }
 
   Future<void> _searchByText() async {
     final query = _controller.text.trim();
-    if (query.isEmpty || _searching) return;
 
-    final online = await ConnectivityService.instance.isOnline();
-    if (!online) {
-      if (mounted) {
-        setState(() =>
-            _error = 'You need an internet connection to search for an SDS.');
+    if (query.isEmpty) {
+      if (!_busy) {
+        _showError(
+          'Please enter a product or chemical name.',
+        );
       }
       return;
     }
 
-    await _runSearch(() => SdsRepository.instance.findByText(query));
+    if (!_beginSearch()) return;
+
+    try {
+      if (!await _checkConnection()) return;
+      if (!mounted) return;
+
+      await _runSearch(
+        () => SdsRepository.instance.findByText(query),
+      );
+
+    } on SdsException catch (error) {
+      _showError(
+        error.message,
+        isQuota: error.isQuotaExceeded,
+      );
+
+    } catch (error) {
+      debugPrint('SDS text search failed: $error');
+
+      _showError(
+        'Could not complete the SDS search. '
+        'Please check your connection and try again.',
+      );
+
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+      }
+    }
   }
 
   Future<void> _searchByPhoto() async {
-    if (_searching) return;
-    final online = await ConnectivityService.instance.isOnline();
-    if (!online) {
-      if (mounted) {
-        setState(() =>
-            _error = 'You need an internet connection to search for an SDS.');
+    if (!_beginSearch()) return;
+
+    final query = _controller.text.trim();
+
+    try {
+      if (!await _checkConnection()) return;
+      if (!mounted) return;
+
+      final photo = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 70,
+        maxWidth: 1800,
+        maxHeight: 1800,
+      );
+
+      if (!mounted || photo == null) return;
+
+      final imageSize = await photo.length();
+
+      if (!mounted) return;
+
+      if (imageSize == 0) {
+        _showError(
+          'The photograph is empty. '
+          'Please take another photo.',
+        );
+        return;
       }
-      return;
+
+      if (imageSize > 5 * 1024 * 1024) {
+        _showError(
+          'The photograph is too large. '
+          'Please take another photo.',
+        );
+        return;
+      }
+
+      final bytes = await photo.readAsBytes();
+
+      if (!mounted) return;
+
+      if (bytes.length > 5 * 1024 * 1024) {
+        _showError('The photograph is too large.');
+        return;
+      }
+
+      final mediaType = _detectImageType(bytes);
+
+      if (mediaType == null) {
+        _showError(
+          'Unsupported image format. '
+          'Please use a JPEG or PNG photograph.',
+        );
+        return;
+      }
+
+      final encodedImage = base64Encode(bytes);
+
+      await _runSearch(
+        () => SdsRepository.instance.findByImage(
+          imageBase64: encodedImage,
+          imageMediaType: mediaType,
+          query: query.isEmpty ? null : query,
+        ),
+      );
+
+    } on SdsException catch (error) {
+      _showError(
+        error.message,
+        isQuota: error.isQuotaExceeded,
+      );
+
+    } catch (error) {
+      debugPrint('SDS photo search failed: $error');
+
+      _showError(
+        'Could not capture or process the photograph. '
+        'Check your camera permissions and try again.',
+      );
+
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+      }
+    }
+  }
+
+  String? _detectImageType(List<int> bytes) {
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF) {
+      return 'image/jpeg';
     }
 
-    final picker = ImagePicker();
-    final photo =
-        await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-    if (photo == null) return;
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A) {
+      return 'image/png';
+    }
 
-    await _runSearch(() async {
-      final bytes = await File(photo.path).readAsBytes();
-      final base64Image = base64Encode(bytes);
-      return SdsRepository.instance.findByImage(
-        imageBase64: base64Image,
-        imageMediaType: 'image/jpeg',
-        query: _controller.text.trim().isEmpty ? null : _controller.text.trim(),
-      );
-    });
+    return null;
+  }
+
+  Uri? _validatedUri(String? value) {
+    if (value == null) return null;
+
+    final uri = Uri.tryParse(value.trim());
+
+    if (uri == null ||
+        !uri.hasAuthority ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        (uri.scheme != 'https' &&
+            uri.scheme != 'http')) {
+      return null;
+    }
+
+    return uri;
+  }
+
+  bool _isPdf(List<int> bytes) {
+    // PDF signature: %PDF-
+    return bytes.length >= 5 &&
+        bytes[0] == 0x25 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x44 &&
+        bytes[3] == 0x46 &&
+        bytes[4] == 0x2D;
   }
 
   Future<void> _saveSds() async {
-    final result = _result;
-    if (result == null || result.sdsUrl == null) return;
-
-    // Shared daily download allowance (2/day free, 20/day Pro) - checked
-    // first, before starting the actual download.
-    try {
-      await DownloadAllowanceService.instance.checkAndConsume();
-    } on DownloadLimitException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
-      return;
+    if (!mounted || _busy) {
+      throw StateError('Another operation is active.');
     }
 
+    final result = _result;
+    final uri = _validatedUri(result?.sdsUrl);
+
+    if (result == null ||
+        !result.found ||
+        !result.directPdf ||
+        uri == null) {
+      _showNotice('No valid SDS download is available.');
+      throw StateError('Invalid SDS download.');
+    }
+
+    setState(() => _savingSds = true);
+
+    Directory? temporaryFolder;
+    final client = http.Client();
+
     try {
-      final response = await http.get(Uri.parse(result.sdsUrl!));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Download failed (HTTP ${response.statusCode})');
+      final response = await client.get(uri).timeout(
+        const Duration(seconds: 45),
+      );
+
+      if (!mounted) {
+        throw StateError('Download screen closed.');
       }
-      final tempDir = await getTemporaryDirectory();
-      final safeName = (result.productName ?? 'SDS')
-          .replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '')
-          .trim();
-      final tempFile = File(
-        '${tempDir.path}/${safeName.isEmpty ? 'SDS' : safeName}.pdf',
-      );
-      await tempFile.writeAsBytes(response.bodyBytes);
-      await FlutterFileDialog.saveFile(
-        params: SaveFileDialogParams(sourceFilePath: tempFile.path),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save this SDS: $e')),
+
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300) {
+        throw StateError(
+          'Download failed (HTTP ${response.statusCode}).',
         );
       }
+
+      if (!_isPdf(response.bodyBytes)) {
+        throw StateError(
+          'The website did not return a PDF document.',
+        );
+      }
+
+      final tempDir = await getTemporaryDirectory();
+
+      temporaryFolder = await tempDir.createTemp(
+        'ohs_sds_',
+      );
+
+      final safeName = (result.productName ?? 'SDS')
+          .replaceAll(RegExp(r'[^a-zA-Z0-9 _-]'), '')
+          .trim();
+
+      final fileName = safeName.isEmpty
+          ? 'SDS'
+          : safeName.length > 80
+              ? safeName.substring(0, 80)
+              : safeName;
+
+      final tempFile = File(
+        '${temporaryFolder.path}/$fileName.pdf',
+      );
+
+      await tempFile.writeAsBytes(
+        response.bodyBytes,
+        flush: true,
+      );
+
+      if (!mounted) {
+        throw StateError('Download screen closed.');
+      }
+
+      if (await tempFile.length() != response.bodyBytes.length) {
+        throw StateError('The prepared PDF is incomplete.');
+      }
+
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        throw StateError('Download screen closed.');
+      }
+
+      // The PDF is now retrieved, checked and prepared.
+      await DownloadAllowanceService.instance.checkAndConsume();
+
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        throw StateError('Download screen closed.');
+      }
+
+      final savedPath = await FlutterFileDialog.saveFile(
+        params: SaveFileDialogParams(
+          sourceFilePath: tempFile.path,
+        ),
+      );
+
+      if (savedPath == null || savedPath.isEmpty) {
+        throw StateError(
+          'Save cancelled. Your download allowance was already used.',
+        );
+      }
+
+      _showNotice('Safety Data Sheet saved successfully.');
+
+    } on DownloadLimitException catch (error) {
+      _showNotice(error.message);
       rethrow;
+
+    } catch (error) {
+      debugPrint('SDS download failed: $error');
+
+      _showNotice(
+        error is StateError
+            ? error.message.toString()
+            : 'Could not save this SDS. '
+              'Please check your connection and try again.',
+      );
+
+      rethrow;
+
+    } finally {
+      client.close();
+
+      if (temporaryFolder != null) {
+        try {
+          await temporaryFolder.delete(recursive: true);
+        } catch (error) {
+          debugPrint('SDS temporary file cleanup failed: $error');
+        }
+      }
+
+      if (mounted) {
+        setState(() => _savingSds = false);
+      }
     }
   }
 
   Future<void> _openInBrowser() async {
-    final url = _result?.sdsUrl;
-    if (url == null) return;
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted || _busy) return;
+
+    final uri = _validatedUri(_result?.sdsUrl);
+
+    if (uri == null) {
+      _showNotice('No valid SDS link is available.');
+      return;
+    }
+
+    setState(() => _openingBrowser = true);
+
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!opened) {
+        _showNotice('Could not open the SDS website.');
+      }
+
+    } catch (error) {
+      debugPrint('SDS browser launch failed: $error');
+      _showNotice('Could not open the SDS website.');
+
+    } finally {
+      if (mounted) {
+        setState(() => _openingBrowser = false);
+      }
     }
   }
 
@@ -195,7 +509,7 @@ class _SdsScreenState extends State<SdsScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    enabled: !_searching,
+                    enabled: !_busy,
                     style: AppText.body(size: 14),
                     decoration: InputDecoration(
                       hintText: 'e.g. petrol by Engen',
@@ -222,7 +536,7 @@ class _SdsScreenState extends State<SdsScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: _searching ? null : _searchByPhoto,
+                  onPressed: _busy ? null : _searchByPhoto,
                   icon: const Icon(Icons.camera_alt_outlined),
                   color: AppColors.amberDeep,
                   tooltip: 'Photograph the label',
@@ -233,7 +547,7 @@ class _SdsScreenState extends State<SdsScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _searching ? null : _searchByText,
+                onPressed: _busy ? null : _searchByText,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.ink,
                   foregroundColor: AppColors.paperRaised,
@@ -342,7 +656,7 @@ class _SdsScreenState extends State<SdsScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: _openInBrowser,
+                onPressed: _busy ? null : _openInBrowser,
                 icon: const Icon(Icons.open_in_new, size: 18),
                 label: const Text('Open SDS in browser'),
               ),
@@ -371,7 +685,13 @@ class _SdsScreenState extends State<SdsScreen> {
           Text(result.message,
               style: AppText.body(size: 13, color: AppColors.steel)),
           const SizedBox(height: 14),
-          AnimatedDownloadButton(onDownload: _saveSds, idleLabel: 'Save SDS'),
+          IgnorePointer(
+            ignoring: _busy,
+            child: AnimatedDownloadButton(
+              onDownload: _saveSds,
+              idleLabel: 'Save SDS',
+            ),
+          ),
         ],
       ),
     );

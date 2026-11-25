@@ -45,26 +45,76 @@ class SignageRepository {
 
   static String _norm(String s) => s.trim().toLowerCase();
 
-  Future<void> load() async {
-    if (_loaded) return;
-    final raw = await rootBundle.loadString('assets/data/signage.json');
-    final decoded = json.decode(raw);
-    List<dynamic> list = <dynamic>[];
+  Future<void>? _catalogueLoading;
+
+  Future<void> load() {
+    if (_loaded) return Future<void>.value();
+
+    return _catalogueLoading ??=
+        _loadCatalogue().whenComplete(
+          () => _catalogueLoading = null,
+        );
+  }
+
+  Future<void> _loadCatalogue() async {
+    final raw = await rootBundle.loadString(
+      'assets/data/signage.json',
+    );
+
+    final decoded = jsonDecode(raw);
+    List<dynamic>? records;
+
+    // Retain compatibility with both existing
+    // catalogue structures.
     if (decoded is List) {
-      list = decoded;
+      records = decoded;
     } else if (decoded is Map) {
-      for (final v in decoded.values) {
-        if (v is List) {
-          list = v;
+      for (final value in decoded.values) {
+        if (value is List) {
+          records = value;
           break;
         }
       }
     }
-    _signs = list
-        .whereType<Map>()
-        .map((m) => SafetySign.fromJson(Map<String, dynamic>.from(m)))
-        .where((s) => s.file.isNotEmpty)
-        .toList();
+
+    if (records == null || records.isEmpty) {
+      throw const FormatException(
+        'Signage catalogue is invalid or empty.',
+      );
+    }
+
+    final signs = <SafetySign>[];
+    final ids = <String>{};
+
+    for (final item in records) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Invalid safety sign record.',
+        );
+      }
+
+      for (final key in ['id', 'label', 'group', 'file']) {
+        final value = item[key];
+
+        if (value is! String || value.trim().isEmpty) {
+          throw const FormatException(
+            'Incomplete safety sign record.',
+          );
+        }
+      }
+
+      final sign = SafetySign.fromJson(item);
+
+      if (!ids.add(sign.id)) {
+        throw const FormatException(
+          'Duplicate safety sign ID.',
+        );
+      }
+
+      signs.add(sign);
+    }
+
+    _signs = signs;
     _loaded = true;
   }
 
