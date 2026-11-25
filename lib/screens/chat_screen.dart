@@ -154,7 +154,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       setState(() {
         _messages.add(
-          ChatMessage(role: 'assistant', content: reply),
+          ChatMessage(role: 'assistant', content: reply ?? (throw StateError('No chatbot response received.'))),
         );
 
         _retryPending = false;
