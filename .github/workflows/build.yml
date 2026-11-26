@@ -60,8 +60,11 @@ jobs:
         run: |
           echo "flutter.targetSdkVersion=36" >> android/local.properties
 
+      - name: Diagnose Android toolchain
+        run: flutter doctor -v
+
       - name: Build App Bundle
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --verbose
 
       - name: Report native Google Play Billing dependencies
         working-directory: android
