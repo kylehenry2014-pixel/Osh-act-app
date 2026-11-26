@@ -66,6 +66,7 @@ jobs:
       - name: Report native Google Play Billing dependencies
         working-directory: android
         run: |
+          set -o pipefail
           bash gradlew :app:dependencyInsight \
             --configuration releaseRuntimeClasspath \
             --dependency com.android.billingclient \
