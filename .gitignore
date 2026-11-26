@@ -1,0 +1,42 @@
+# Flutter and Dart generated files
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+**/doc/api/
+
+# Android generated files
+**/.gradle/
+**/.cxx/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# Signing credentials - never commit
+**/key.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+
+# Local credentials
+.env
+.env.*
+!.env.example
+*service-account*.json
+*serviceAccountKey*.json
+
+# IDE and operating system files
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+*.log
+
+# Keep application dependency lock file
+!pubspec.lock

@@ -267,37 +267,85 @@ class _DetailScreenState extends State<DetailScreen> {
               isSpeaking: _isSpeaking,
               onSpeechTap: _toggleSpeech,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(entry.collection, style: AppText.label(size: 12, color: AppColors.amberDeep)),
-                  const SizedBox(height: 4),
-                  Text('Section / Regulation ${entry.num}', style: AppText.label(size: 11)),
-                  const SizedBox(height: 8),
-                  Text(displayTitle, style: AppText.headline(size: 22)),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: AppColors.lineStrong),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(22, 16, 22, 24),
-                children: [
-                  if (showLanguageNote) _LanguageNote(isTranslated: isTranslated),
-                  ...paragraphs.map((p) => Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: Text(p, style: AppText.body()),
-                      )),
-                  const SizedBox(height: 8),
-                  _NotesSection(
-                    open: _notesOpen,
-                    onToggle: () => setState(() => _notesOpen = !_notesOpen),
-                    controller: _noteController,
-                    onChanged: _saveNote,
+              child: TextSelectionTheme(
+                data: TextSelectionTheme.of(context).copyWith(
+                  cursorColor: AppColors.amberDeep,
+                  selectionColor: AppColors.amber.withValues(alpha: 0.35),
+                  selectionHandleColor: AppColors.amberDeep,
+                ),
+                child: SelectionArea(
+                  key: ValueKey(
+                    '${entry.id}:${_translations.currentLanguage}',
                   ),
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.collection,
+                              style: AppText.label(
+                                size: 12,
+                                color: AppColors.amberDeep,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Section / Regulation ${entry.num}',
+                              style: AppText.label(size: 11),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              displayTitle,
+                              style: AppText.headline(size: 22),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(
+                        height: 1,
+                        color: AppColors.lineStrong,
+                      ),
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(22, 16, 22, 24),
+                          children: [
+                            if (showLanguageNote)
+                              SelectionContainer.disabled(
+                                child: _LanguageNote(
+                                  isTranslated: isTranslated,
+                                ),
+                              ),
+                            ...paragraphs.map(
+                              (p) => Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: Text(
+                                  p,
+                                  style: AppText.body(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SelectionContainer.disabled(
+                              child: _NotesSection(
+                                open: _notesOpen,
+                                onToggle: () => setState(
+                                  () => _notesOpen = !_notesOpen,
+                                ),
+                                controller: _noteController,
+                                onChanged: _saveNote,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
             _PrevNextBar(

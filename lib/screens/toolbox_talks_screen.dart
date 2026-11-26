@@ -85,8 +85,10 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final talkOfDay = ToolboxTalksRepository.instance.talkOfTheDay();
     final categories = ToolboxTalksRepository.instance.categories;
+    final talkOfDay = categories.isEmpty
+        ? null
+        : ToolboxTalksRepository.instance.talkOfTheDay();
     final searching = _query.trim().isNotEmpty;
     final searchResults = searching
         ? ToolboxTalksRepository.instance.search(query: _query)
@@ -102,44 +104,22 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
       ),
       body: Column(
         children: [
-          if (!searching)
+          if (!searching && talkOfDay != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: InkWell(
+              child: _PremiumDailyTalkCard(
+                entry: talkOfDay,
                 onTap: () => _openDetail(talkOfDay),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.amberDeep,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.today_outlined, color: Colors.white),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Talk of the Day',
-                              style:
-                                  AppText.label(size: 11, color: Colors.white),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              talkOfDay.title,
-                              style: AppText.headline(
-                                      size: 15, weight: FontWeight.w600)
-                                  .copyWith(color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right, color: Colors.white),
-                    ],
-                  ),
+              ),
+            ),
+          if (!searching && talkOfDay == null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Toolbox Talks are currently unavailable.',
+                style: AppText.body(
+                  size: 13,
+                  color: AppColors.steel,
                 ),
               ),
             ),
@@ -254,6 +234,225 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
     );
   }
 }
+
+class _PremiumDailyTalkCard extends StatelessWidget {
+  final ToolboxTalkEntry entry;
+  final VoidCallback onTap;
+
+  const _PremiumDailyTalkCard({
+    required this.entry,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final dateLabel = MaterialLocalizations.of(context)
+        .formatShortMonthDay(now)
+        .toUpperCase();
+
+    final compact =
+        MediaQuery.sizeOf(context).height < 650 ||
+        MediaQuery.textScalerOf(context).scale(14) > 18;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.amberDeep,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: AppColors.ink,
+        borderRadius: BorderRadius.circular(15),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF353930),
+                Color(0xFF141611),
+              ],
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const HazardStripe(height: 6),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.today_outlined,
+                            color: AppColors.amber,
+                            size: 17,
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              'DAILY SAFETY BRIEFING',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.label(
+                                size: 10,
+                                color: AppColors.amber,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.amber.withValues(
+                                alpha: 0.08,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: AppColors.amber.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              dateLabel,
+                              style: AppText.label(
+                                size: 10,
+                                color: AppColors.amber,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Toolbox Talk of the Day',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.headline(
+                          size: 21,
+                          weight: FontWeight.w700,
+                        ).copyWith(
+                          color: AppColors.paperRaised,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 1,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.amber.withValues(alpha: 0.65),
+                              AppColors.amber.withValues(alpha: 0),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        entry.category.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.label(
+                          size: 10,
+                          color: AppColors.amber,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        entry.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.headline(
+                          size: 18,
+                          weight: FontWeight.w600,
+                        ).copyWith(
+                          color: AppColors.paperRaised,
+                          height: 1.25,
+                        ),
+                      ),
+                      if (!compact &&
+                          entry.description.trim().isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          entry.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.body(
+                            size: 12,
+                            color: const Color(0xFFC3C5BB),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      Container(
+                        constraints: const BoxConstraints(
+                          minHeight: 46,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 13,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(9),
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFFE8B84F),
+                              Color(0xFFC18A24),
+                            ],
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                "View today's toolbox talk",
+                                style: AppText.headline(
+                                  size: 12,
+                                  weight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              color: AppColors.ink,
+                              size: 19,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const HazardStripe(height: 4),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 class _CategoryTalksScreen extends StatelessWidget {
   final String category;

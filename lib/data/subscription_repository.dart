@@ -138,32 +138,77 @@ class SubscriptionRepository {
 
   Future<List<ProductDetails>> _queryProductsOnce() async {
     lastQueryDiagnostic = null;
-    var stage = 'connecting to Play billing';
-    try {
 
-      final available = await _iap.isAvailable().timeout(const Duration(seconds: 15));
+    final total = Stopwatch()..start();
+    final stageTimer = Stopwatch()..start();
+
+    var stage = 'BILLING_CONNECTION';
+    String connectionTime = 'not completed';
+
+    void report(String message) {
+      lastQueryDiagnostic =
+          '$stage | $message | '
+          'Connection: $connectionTime | '
+          'Total: ${total.elapsedMilliseconds}ms';
+
+      debugPrint('[OHS Billing] $lastQueryDiagnostic');
+    }
+
+    try {
+      debugPrint('[OHS Billing] Connecting to Google Play');
+
+      final available = await _iap.isAvailable().timeout(
+        const Duration(seconds: 15),
+      );
+
+      connectionTime = '${stageTimer.elapsedMilliseconds}ms';
+
       if (!available) {
-        lastQueryDiagnostic =
-            'Google Play Billing is not available. Is the app installed from Google Play, and is the Play Store up to date?';
+        report('Google Play Billing is unavailable.');
         return [];
       }
-      stage = 'loading the product from Play';
-      final response = await _iap.queryProductDetails(productIds).timeout(const Duration(seconds: 45));
+
+      stage = 'PRODUCT_QUERY';
+      stageTimer
+        ..reset()
+        ..start();
+
+      debugPrint('[OHS Billing] Requesting subscription product');
+
+      final response = await _iap.queryProductDetails(productIds).timeout(
+        const Duration(seconds: 45),
+      );
+
       final error = response.error;
+
       if (error != null) {
-        lastQueryDiagnostic =
-            'Play returned an error: ' + error.code + ' - ' + error.message;
+        report('Google Play error code: ${error.code}');
       } else if (response.notFoundIDs.isNotEmpty) {
-        lastQueryDiagnostic = 'Play did not find these product IDs: ' +
-            response.notFoundIDs.join(', ') +
-            ' (check the ID, and that the subscription and its base plan are Active).';
+        report(
+          'Subscription product not found. '
+          'Check product ID, active base plan and region.',
+        );
       } else if (response.productDetails.isEmpty) {
-        lastQueryDiagnostic = 'Play returned no products.';
+        report('Google Play returned no subscription products.');
+      } else {
+        report(
+          'Success: ${response.productDetails.length} product(s) '
+          'in ${stageTimer.elapsedMilliseconds}ms.',
+        );
       }
+
       return response.productDetails;
-    } catch (e) {
-      lastQueryDiagnostic = 'Error while ' + stage + ': ' + e.toString();
+    } on TimeoutException {
+      report(
+        'Timeout after ${stageTimer.elapsedMilliseconds}ms.',
+      );
       return [];
+    } catch (error) {
+      report('Exception type: ${error.runtimeType}');
+      return [];
+    } finally {
+      total.stop();
+      stageTimer.stop();
     }
   }
 

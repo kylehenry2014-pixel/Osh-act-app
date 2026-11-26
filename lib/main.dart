@@ -749,7 +749,7 @@ class _PremiumNavTab extends StatelessWidget {
 // SUBTLE INDUSTRIAL DANGER TAPE ACCENTS
 // =====================================================
 
-class _NavTapeAccent extends StatelessWidget {
+class _NavTapeAccent extends StatefulWidget {
   final bool reverse;
 
   const _NavTapeAccent({
@@ -757,25 +757,79 @@ class _NavTapeAccent extends StatelessWidget {
   });
 
   @override
+  State<_NavTapeAccent> createState() =>
+      _NavTapeAccentState();
+}
+
+class _NavTapeAccentState extends State<_NavTapeAccent>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final reducedMotion =
+        MediaQuery.of(context).disableAnimations;
+    final tickerEnabled = TickerMode.of(context);
+
+    if (reducedMotion) {
+      _controller.stop();
+      _controller.value = 0;
+    } else if (!tickerEnabled) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 30,
-      height: 3,
-      child: CustomPaint(
-        painter: _NavTapePainter(reverse),
+    return RepaintBoundary(
+      child: SizedBox(
+        width: 30,
+        height: 3,
+        child: CustomPaint(
+          painter: _NavTapePainter(
+            animation: _controller,
+            reverse: widget.reverse,
+          ),
+        ),
       ),
     );
   }
 }
 
 class _NavTapePainter extends CustomPainter {
+  final Animation<double> animation;
   final bool reverse;
 
-  const _NavTapePainter(this.reverse);
+  _NavTapePainter({
+    required this.animation,
+    required this.reverse,
+  }) : super(repaint: animation);
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
+    const period = 10.0;
+    final shift = animation.value * period;
 
     canvas.save();
     canvas.clipRect(rect);
@@ -794,9 +848,9 @@ class _NavTapePainter extends CustomPainter {
       ..color = _NavStyle.gold;
 
     for (
-      double x = -8;
-      x < size.width + 8;
-      x += 10
+      double x = -18 + shift;
+      x < size.width + 18;
+      x += period
     ) {
       final path = Path()
         ..moveTo(x, size.height)
@@ -814,5 +868,7 @@ class _NavTapePainter extends CustomPainter {
   @override
   bool shouldRepaint(
     covariant _NavTapePainter oldDelegate,
-  ) => oldDelegate.reverse != reverse;
+  ) =>
+      oldDelegate.reverse != reverse ||
+      oldDelegate.animation != animation;
 }
