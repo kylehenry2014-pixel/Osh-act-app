@@ -487,12 +487,10 @@ class _SdsScreenState extends State<SdsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('SDS Finder', style: AppText.headline(size: 20)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'SDS Finder',
+        titleSize: 20,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -501,7 +499,7 @@ class _SdsScreenState extends State<SdsScreen> {
           children: [
             Text(
               'Type a product and brand, or photograph the container label, to find its official Safety Data Sheet.',
-              style: AppText.body(size: 14, color: AppColors.steel),
+              style: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
             ),
             const SizedBox(height: 16),
             Row(
@@ -510,25 +508,25 @@ class _SdsScreenState extends State<SdsScreen> {
                   child: TextField(
                     controller: _controller,
                     enabled: !_busy,
-                    style: AppText.body(size: 14),
+                    style: AppText.body(size: 14, color: AppPalette.of(context).text),
                     decoration: InputDecoration(
                       hintText: 'e.g. petrol by Engen',
-                      hintStyle: AppText.body(size: 14, color: AppColors.steel),
+                      hintStyle: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
                       filled: true,
-                      fillColor: AppColors.paperRaised,
+                      fillColor: AppPalette.of(context).surface,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.zero,
-                        borderSide: BorderSide(color: AppColors.line),
+                        borderSide: BorderSide(color: AppPalette.of(context).border),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.zero,
-                        borderSide: BorderSide(color: AppColors.line),
+                        borderSide: BorderSide(color: AppPalette.of(context).border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.zero,
-                        borderSide: BorderSide(color: AppColors.amberDeep),
+                        borderSide: BorderSide(color: AppPalette.of(context).accent),
                       ),
                     ),
                     onSubmitted: (_) => _searchByText(),
@@ -538,7 +536,7 @@ class _SdsScreenState extends State<SdsScreen> {
                 IconButton(
                   onPressed: _busy ? null : _searchByPhoto,
                   icon: const Icon(Icons.camera_alt_outlined),
-                  color: AppColors.amberDeep,
+                  color: AppPalette.of(context).accent,
                   tooltip: 'Photograph the label',
                 ),
               ],
@@ -549,22 +547,22 @@ class _SdsScreenState extends State<SdsScreen> {
               child: ElevatedButton(
                 onPressed: _busy ? null : _searchByText,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.ink,
-                  foregroundColor: AppColors.paperRaised,
+                  backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppPalette.of(context).accent : AppColors.ink,
+                  foregroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : AppColors.paperRaised,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(2)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: _searching
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2, color: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white),
                       )
                     : Text('Search',
                         style: AppText.label(
-                            size: 12, color: AppColors.paperRaised)),
+                            size: 12, color: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : AppColors.paperRaised)),
               ),
             ),
             const SizedBox(height: 20),
@@ -572,7 +570,7 @@ class _SdsScreenState extends State<SdsScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
-                color: (_errorIsQuota ? AppColors.amberDeep : AppColors.red)
+                color: (_errorIsQuota ? AppPalette.of(context).accent : AppPalette.of(context).error)
                     .withValues(alpha: 0.1),
                 child: Row(
                   children: [
@@ -582,7 +580,7 @@ class _SdsScreenState extends State<SdsScreen> {
                           : Icons.error_outline,
                       size: 16,
                       color:
-                          _errorIsQuota ? AppColors.amberDeep : AppColors.red,
+                          _errorIsQuota ? AppPalette.of(context).accent : AppPalette.of(context).error,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -590,8 +588,8 @@ class _SdsScreenState extends State<SdsScreen> {
                           style: AppText.label(
                             size: 12,
                             color: _errorIsQuota
-                                ? AppColors.amberDeep
-                                : AppColors.red,
+                                ? AppPalette.of(context).accent
+                                : AppPalette.of(context).error,
                           )),
                     ),
                   ],
@@ -610,16 +608,16 @@ class _SdsScreenState extends State<SdsScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-            color: AppColors.paperRaised,
-            border: Border.all(color: AppColors.line)),
+            color: AppPalette.of(context).surface,
+            border: Border.all(color: AppPalette.of(context).border)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Not found',
-                style: AppText.headline(size: 15, weight: FontWeight.w600)),
+                style: AppText.headline(size: 15, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
             const SizedBox(height: 6),
             Text(result.message,
-                style: AppText.body(size: 13, color: AppColors.steel)),
+                style: AppText.body(size: 13, color: AppPalette.of(context).secondaryText)),
           ],
         ),
       );
@@ -630,8 +628,8 @@ class _SdsScreenState extends State<SdsScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-            color: AppColors.paperRaised,
-            border: Border.all(color: AppColors.line)),
+            color: AppPalette.of(context).surface,
+            border: Border.all(color: AppPalette.of(context).border)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -645,12 +643,12 @@ class _SdsScreenState extends State<SdsScreen> {
             const SizedBox(height: 12),
             Text(
               'Beep boop, access denied.',
-              style: AppText.headline(size: 15, weight: FontWeight.w600),
+              style: AppText.headline(size: 15, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text),
             ),
             const SizedBox(height: 6),
             Text(
               "This site doesn't trust bots (rude, but fair - I am one). I found ${result.productName ?? 'the product'}'s SDS, but couldn't grab it automatically. Tap below to open it yourself.",
-              style: AppText.body(size: 13, color: AppColors.steel),
+              style: AppText.body(size: 13, color: AppPalette.of(context).secondaryText),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -670,20 +668,20 @@ class _SdsScreenState extends State<SdsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-          color: AppColors.paperRaised,
-          border: Border.all(color: AppColors.line)),
+          color: AppPalette.of(context).surface,
+          border: Border.all(color: AppPalette.of(context).border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(result.productName ?? 'Safety Data Sheet',
-              style: AppText.headline(size: 16, weight: FontWeight.w600)),
+              style: AppText.headline(size: 16, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
           if (result.manufacturer != null) ...[
             const SizedBox(height: 3),
-            Text(result.manufacturer!, style: AppText.label(size: 11)),
+            Text(result.manufacturer!, style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
           ],
           const SizedBox(height: 10),
           Text(result.message,
-              style: AppText.body(size: 13, color: AppColors.steel)),
+              style: AppText.body(size: 13, color: AppPalette.of(context).secondaryText)),
           const SizedBox(height: 14),
           IgnorePointer(
             ignoring: _busy,

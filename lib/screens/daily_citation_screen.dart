@@ -143,16 +143,14 @@ class _DailyCitationScreenState extends State<DailyCitationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('Daily Citation', style: AppText.headline(size: 18)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'Daily Citation',
+        titleSize: 18,
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.amberDeep))
+          ? Center(
+              child: CircularProgressIndicator(color: AppPalette.of(context).accent))
           : _loadError != null
               ? Center(
                   child: Padding(
@@ -163,7 +161,7 @@ class _DailyCitationScreenState extends State<DailyCitationScreen> {
                         Text(
                           _loadError!,
                           textAlign: TextAlign.center,
-                          style: AppText.body(),
+                          style: AppText.body(color: AppPalette.of(context).text),
                         ),
                         const SizedBox(height: 16),
                         OutlinedButton(
@@ -180,23 +178,23 @@ class _DailyCitationScreenState extends State<DailyCitationScreen> {
                 Text(
                   'Get one section from the Acts and Regulations as a '
                   'notification every day at 12:00.',
-                  style: AppText.body(size: 14, color: AppColors.steel),
+                  style: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
                 ),
                 const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text('Send a daily citation',
                       style:
-                          AppText.headline(size: 16, weight: FontWeight.w600)),
+                          AppText.headline(size: 16, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
                   subtitle: Text('Every day at 12:00',
-                      style: AppText.label(size: 11)),
+                      style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
                   value: _enabled,
                   onChanged: _busy ? null : _toggle,
                 ),
-                const Divider(color: AppColors.line),
+                Divider(color: AppPalette.of(context).border),
                 const SizedBox(height: 8),
                 Text('ACTS TO INCLUDE',
-                    style: AppText.label(size: 11, color: AppColors.amberDeep)),
+                    style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
                 const SizedBox(height: 4),
                 for (final s in _sources)
                   CheckboxListTile(
@@ -204,20 +202,20 @@ class _DailyCitationScreenState extends State<DailyCitationScreen> {
                     controlAffinity: ListTileControlAffinity.leading,
                     value: _selected.contains(s.key),
                     onChanged: _busy ? null : (v) => _toggleSource(s.key, v ?? false),
-                    title: Text(s.label, style: AppText.body(size: 14)),
+                    title: Text(s.label, style: AppText.body(size: 14, color: AppPalette.of(context).text)),
                   ),
                 const SizedBox(height: 16),
                 OutlinedButton(
                   onPressed: _busy ? null : _sendTest,
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: AppColors.paperRaised,
-                    side: const BorderSide(color: AppColors.ink, width: 1.5),
+                    backgroundColor: AppPalette.of(context).surface,
+                    side: BorderSide(color: AppPalette.of(context).text, width: 1.5),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(2)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: Text('Send a test notification',
-                      style: AppText.label(size: 11.5, color: AppColors.ink)),
+                      style: AppText.label(size: 11.5, color: AppPalette.of(context).text)),
                 ),
               ],
             ),

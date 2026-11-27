@@ -15,6 +15,7 @@ import 'data/subscription_repository.dart';
 import 'data/toolbox_talks_repository.dart';
 import 'data/translations_repository.dart';
 import 'theme/app_theme.dart';
+import 'theme/appearance_controller.dart';
 import 'screens/explore_screen.dart';
 import 'screens/more_screen.dart';
 import 'widgets/ohs_splash.dart';
@@ -44,6 +45,10 @@ Future<void> main() async {
 
   await Future.wait<void>([
     _initialiseOptionalService(
+      'Appearance',
+      AppearanceController.instance.load,
+    ),
+    _initialiseOptionalService(
       'Advertisements',
       AdService.instance.init,
     ),
@@ -65,11 +70,53 @@ class OhsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OHS Act & Regulations',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: const _SplashGate(child: RootShell()),
+    final appearance = AppearanceController.instance;
+
+    return ListenableBuilder(
+      listenable: appearance,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'OHS Act & Regulations',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          darkTheme: buildAppTheme(
+            brightness: Brightness.dark,
+          ),
+          themeMode: kEnableAdaptiveAppearance
+              ? appearance.mode
+              : ThemeMode.light,
+          themeAnimationDuration:
+              MediaQueryData.fromView(View.of(context))
+                      .disableAnimations
+                  ? Duration.zero
+                  : const Duration(milliseconds: 220),
+          themeAnimationCurve: Curves.easeInOut,
+          builder: (context, child) {
+            final dark =
+                Theme.of(context).brightness == Brightness.dark;
+
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness:
+                    dark ? Brightness.light : Brightness.dark,
+                statusBarBrightness:
+                    dark ? Brightness.dark : Brightness.light,
+                systemNavigationBarColor:
+                    const Color(0xFF10120F),
+                systemNavigationBarIconBrightness:
+                    Brightness.light,
+                systemNavigationBarDividerColor:
+                    Colors.transparent,
+                systemNavigationBarContrastEnforced: false,
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          home: child,
+        );
+      },
+      child: const _SplashGate(child: RootShell()),
     );
   }
 }
@@ -93,12 +140,19 @@ class _SplashGateState extends State<_SplashGate> {
         widget.child,
         if (_showSplash)
           Positioned.fill(
-            child: OhsSplash(
-              onFinished: () {
-                if (mounted) {
-                  setState(() => _showSplash = false);
-                }
-              },
+            child: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              ),
+              child: OhsSplash(
+                onFinished: () {
+                  if (mounted) {
+                    setState(() => _showSplash = false);
+                  }
+                },
+              ),
             ),
           ),
       ],
@@ -263,30 +317,30 @@ class _RootShellState extends State<RootShell> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: AppColors.paper,
+      return Scaffold(
+        backgroundColor: AppPalette.of(context).background,
         body: Center(
-            child: CircularProgressIndicator(color: AppColors.amberDeep)),
+            child: CircularProgressIndicator(color: AppPalette.of(context).accent)),
       );
     }
     if (_loadError != null) {
       return Scaffold(
-        backgroundColor: AppColors.paper,
+        backgroundColor: AppPalette.of(context).background,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.warning_amber_rounded,
                   size: 48,
-                  color: AppColors.amberDeep,
+                  color: AppPalette.of(context).accent,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   _loadError!,
-                  style: AppText.body(),
+                  style: AppText.body(color: AppPalette.of(context).text),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
@@ -304,7 +358,6 @@ class _RootShellState extends State<RootShell> {
 
     final tabs = [
       ExploreScreen(key: _homeKey, autoFocusSearch: false),
-      const ExploreScreen(autoFocusSearch: true),
       const MoreScreen(),
     ];
 
@@ -321,7 +374,7 @@ class _RootShellState extends State<RootShell> {
         }
       },
       child: Scaffold(
-        backgroundColor: AppColors.paper,
+        backgroundColor: AppPalette.of(context).background,
         body: _PremiumTabStack(index: _tabIndex, children: tabs),
         bottomNavigationBar:
             _BottomNav(currentIndex: _tabIndex, onTap: _onTabTapped),
@@ -340,17 +393,7 @@ class _NavStyle {
   static const lightGold = Color(0xFFFFE4A0);
   static const inactive = Color(0xFFC5C6BB);
 
-  static const metallicBorder = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF805014),
-      Color(0xFFFFE4A0),
-      Color(0xFF95621C),
-      Color(0xFFDA9B2A),
-      Color(0xFFFFD77A),
-    ],
-  );
+
 
   static const glossyCharcoal = LinearGradient(
     begin: Alignment.topCenter,
@@ -398,7 +441,7 @@ class _PremiumTabStackState extends State<_PremiumTabStack>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 220),
       value: 1,
     );
 
@@ -408,12 +451,12 @@ class _PremiumTabStackState extends State<_PremiumTabStack>
     );
 
     _opacity = Tween<double>(
-      begin: 0.55,
+      begin: 0.85,
       end: 1,
     ).animate(_curve);
 
     _offset = Tween<Offset>(
-      begin: const Offset(0, 0.012),
+      begin: const Offset(0, 0.006),
       end: Offset.zero,
     ).animate(_curve);
   }
@@ -479,7 +522,7 @@ class _PremiumTabStackState extends State<_PremiumTabStack>
 }
 
 // =====================================================
-// FLOATING GLOSSY NAVIGATION BAR
+// INTEGRATED GLOSSY NAVIGATION BAR
 // =====================================================
 
 class _BottomNav extends StatelessWidget {
@@ -498,54 +541,45 @@ class _BottomNav extends StatelessWidget {
 
     final duration = reducedMotion
         ? Duration.zero
-        : const Duration(milliseconds: 280);
+        : const Duration(milliseconds: 220);
 
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(12, 7, 12, 10),
-      child: Container(
-        padding: const EdgeInsets.all(1.5),
-        decoration: BoxDecoration(
-          gradient: _NavStyle.metallicBorder,
-          borderRadius: BorderRadius.circular(27),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 16,
-              offset: Offset(0, 6),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        systemNavigationBarColor: Color(0xFF10120F),
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: _NavStyle.glossyCharcoal,
+          border: Border(
+            top: BorderSide(
+              color: _NavStyle.gold,
+              width: 1,
             ),
-            BoxShadow(
-              color: Color(0x22DA9B2A),
-              blurRadius: 7,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            gradient: _NavStyle.glossyCharcoal,
-            borderRadius: BorderRadius.circular(25.5),
           ),
+        ),
+        child: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: 4),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(5, 7, 5, 10),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final tabWidth =
-                    constraints.maxWidth / 3;
+                final tabWidth = constraints.maxWidth / 2;
 
                 return Stack(
                   children: [
                     AnimatedPositioned(
                       duration: duration,
                       curve: Curves.easeOutCubic,
-                      left: currentIndex * tabWidth + 2,
+                      left: currentIndex * tabWidth + 3,
                       top: 0,
                       bottom: 0,
-                      width: tabWidth - 4,
+                      width: tabWidth - 6,
                       child: const _GoldSelectionIndicator(),
                     ),
-
                     Row(
                       children: [
                         Expanded(
@@ -558,23 +592,14 @@ class _BottomNav extends StatelessWidget {
                         ),
                         Expanded(
                           child: _PremiumNavTab(
-                            icon: Icons.search_rounded,
-                            label: 'Search',
+                            icon: Icons.grid_view_rounded,
+                            label: 'More',
                             active: currentIndex == 1,
                             onTap: () => onTap(1),
                           ),
                         ),
-                        Expanded(
-                          child: _PremiumNavTab(
-                            icon: Icons.grid_view_rounded,
-                            label: 'More',
-                            active: currentIndex == 2,
-                            onTap: () => onTap(2),
-                          ),
-                        ),
                       ],
                     ),
-
                     const Positioned(
                       left: 9,
                       bottom: 0,
@@ -582,7 +607,6 @@ class _BottomNav extends StatelessWidget {
                         child: _NavTapeAccent(),
                       ),
                     ),
-
                     const Positioned(
                       right: 9,
                       bottom: 0,
@@ -679,7 +703,7 @@ class _PremiumNavTab extends StatelessWidget {
 
     final duration = reducedMotion
         ? Duration.zero
-        : const Duration(milliseconds: 220);
+        : const Duration(milliseconds: 180);
 
     final color = active
         ? _NavStyle.lightGold
@@ -704,7 +728,7 @@ class _PremiumNavTab extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AnimatedScale(
-                  scale: active ? 1.08 : 1,
+                  scale: active ? 1.04 : 1,
                   duration: duration,
                   curve: Curves.easeOutCubic,
                   child: TweenAnimationBuilder<Color?>(

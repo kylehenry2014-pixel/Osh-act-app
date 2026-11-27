@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../data/subscription_repository.dart';
 import '../theme/app_theme.dart';
@@ -18,7 +19,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   List<ProductDetails> _products = [];
   bool _loading = true;
   bool _purchasing = false;
+  bool _restoreRequestInFlight = false;
   String? _error;
+  String? _purchaseMessage;
 
   @override
   void initState() {
@@ -31,6 +34,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _loading = true;
       _products = [];
       _error = null;
+      _purchaseMessage = null;
     });
     _loadProducts();
   }
@@ -66,16 +70,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _buy(ProductDetails product) async {
-    if (_purchasing) return;
+    if (_purchasing || _restoreRequestInFlight) return;
+    if (SubscriptionRepository.instance.isPro) return;
+
     setState(() {
       _purchasing = true;
       _error = null;
+      _purchaseMessage = 'Opening secure Google Play checkout...';
     });
+
     try {
       await SubscriptionRepository.instance.buy(product);
+
+      if (!mounted) return;
+
+      setState(() {
+        _purchaseMessage =
+            'Follow the Google Play instructions. Premium benefits '
+            'will activate after successful purchase verification.';
+      });
     } catch (_) {
       if (mounted) {
         setState(() {
+          _purchaseMessage = null;
           _error =
               'Something went wrong starting the purchase. Please try again.';
         });
@@ -86,16 +103,45 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _restore() async {
-    if (_purchasing) return;
+    if (_purchasing || _restoreRequestInFlight) return;
+
     setState(() {
       _purchasing = true;
+      _restoreRequestInFlight = true;
       _error = null;
+      _purchaseMessage = 'Checking Google Play for existing purchases...';
     });
+
     try {
-      await SubscriptionRepository.instance.restorePurchases();
+      final request = SubscriptionRepository.instance
+          .restorePurchases()
+          .whenComplete(() {
+        if (mounted) {
+          setState(() => _restoreRequestInFlight = false);
+        }
+      });
+
+      await request.timeout(const Duration(seconds: 30));
+
+      if (!mounted) return;
+
+      setState(() {
+        _purchaseMessage =
+            'Restore request completed. Eligible purchases will '
+            'activate after verification.';
+      });
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _purchaseMessage =
+              'Google Play is taking longer than expected. '
+              'Your restore request may still be processing.';
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
+          _purchaseMessage = null;
           _error = 'Could not restore purchases. Please try again.';
         });
       }
@@ -107,8 +153,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: AppPalette.of(context).background,
       appBar: AppBar(
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
         backgroundColor: _PremiumColors.ink,
         foregroundColor: _PremiumColors.cream,
         surfaceTintColor: Colors.transparent,
@@ -181,27 +232,62 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               padding: const EdgeInsets.only(bottom: 12),
                               child: _PlanCard(
                                 product: product,
-                                enabled: !_purchasing,
+                                enabled: !_purchasing &&
+                                    !_restoreRequestInFlight,
                                 onTap: () => _buy(product),
                               ),
                             ),
+
+                        if (!isPro && _purchaseMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppPalette.of(context).surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppPalette.of(context).border,
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 20,
+                                  color: AppPalette.of(context).accent,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _purchaseMessage!,
+                                    style: AppText.body(
+                                      size: 13,
+                                      color: AppPalette.of(context).text,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
 
                         if (!isPro && _error != null) ...[
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.red.withValues(alpha: 0.07),
+                              color: AppPalette.of(context).error.withValues(alpha: 0.07),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: AppColors.red.withValues(alpha: 0.25),
+                                color: AppPalette.of(context).error.withValues(alpha: 0.25),
                               ),
                             ),
                             child: Text(
                               _error!,
                               style: AppText.body(
                                 size: 13,
-                                color: AppColors.red,
+                                color: AppPalette.of(context).error,
                               ),
                             ),
                           ),
@@ -218,7 +304,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             'Details: ${SubscriptionRepository.instance.lastQueryDiagnostic}',
                             style: AppText.label(
                               size: 11,
-                              color: AppColors.steel,
+                              color: AppPalette.of(context).secondaryText,
                             ),
                           ),
                         ],
@@ -226,23 +312,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         const SizedBox(height: 18),
 
                         if (_purchasing)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 12),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
                             child: Center(
                               child: CircularProgressIndicator(
-                                color: _PremiumColors.gold,
+                                color: AppPalette.of(context).accent,
                               ),
                             ),
                           ),
 
                         OutlinedButton.icon(
-                          onPressed: _purchasing ? null : _restore,
+                          onPressed:
+                              _purchasing || _restoreRequestInFlight
+                                  ? null
+                                  : _restore,
                           icon: const Icon(Icons.restore, size: 21),
                           label: const Text('Restore Purchases'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: _PremiumColors.ink,
-                            side: const BorderSide(
-                              color: _PremiumColors.bronze,
+                            foregroundColor: AppPalette.of(context).text,
+                            side: BorderSide(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? _PremiumColors.lightGold
+                                  : _PremiumColors.bronze,
                               width: 1.3,
                             ),
                             minimumSize: const Size.fromHeight(48),
@@ -259,7 +350,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           textAlign: TextAlign.center,
                           style: AppText.label(
                             size: 11,
-                            color: AppColors.steel,
+                            color: AppPalette.of(context).secondaryText,
                           ),
                         ),
                       ],
@@ -659,15 +750,17 @@ class _BenefitCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFFCF3),
-              Color(0xFFF7F3E6),
-              Color(0xFFECE0C5),
-            ],
-          ),
+          gradient: Theme.of(context).brightness == Brightness.dark
+              ? _PremiumColors.darkGradient
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFFFFCF3),
+                    Color(0xFFF7F3E6),
+                    Color(0xFFECE0C5),
+                  ],
+                ),
         ),
         child: Row(
           children: [
@@ -698,6 +791,8 @@ class _BenefitCard extends StatelessWidget {
                     style: AppText.headline(
                       size: 15,
                       weight: FontWeight.w700,
+                    ).copyWith(
+                      color: AppPalette.of(context).text,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -705,16 +800,18 @@ class _BenefitCard extends StatelessWidget {
                     subtitle,
                     style: AppText.body(
                       size: 12,
-                      color: AppColors.steel,
+                      color: AppPalette.of(context).secondaryText,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(
+            Icon(
               Icons.check_rounded,
-              color: _PremiumColors.bronze,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? _PremiumColors.lightGold
+                  : _PremiumColors.bronze,
               size: 24,
             ),
           ],

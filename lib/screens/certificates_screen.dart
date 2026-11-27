@@ -37,17 +37,15 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
     final certs = CertificatesRepository.instance.all;
 
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('Certificate Reminders', style: AppText.headline(size: 18)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'Certificate Reminders',
+        titleSize: 18,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openAdd,
-        backgroundColor: AppColors.amberDeep,
-        foregroundColor: Colors.white,
+        backgroundColor: AppPalette.of(context).accent,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         child: const Icon(Icons.add),
       ),
@@ -78,12 +76,12 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.badge_outlined, size: 40, color: AppColors.steel),
+            Icon(Icons.badge_outlined, size: 40, color: AppPalette.of(context).secondaryText),
             const SizedBox(height: 16),
             Text(
               'No certificates saved yet. Add photos of a certificate - even a multi-page one like a full medical pack - and set its expiry date, and this app will remind you before it lapses.',
               textAlign: TextAlign.center,
-              style: AppText.body(size: 14, color: AppColors.steel),
+              style: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -91,8 +89,8 @@ class _EmptyState extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Add Certificate'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.amberDeep,
-                foregroundColor: Colors.white,
+                backgroundColor: AppPalette.of(context).accent,
+                foregroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(2)),
               ),
@@ -112,7 +110,7 @@ class _CertificateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (statusColor, statusLabel) = _statusInfo(certificate);
+    final (statusColor, statusLabel) = _statusInfo(context, certificate);
     final pageCount = certificate.imagePaths.length;
 
     return InkWell(
@@ -120,8 +118,8 @@ class _CertificateCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.paperRaised,
-          border: Border.all(color: AppColors.line),
+          color: AppPalette.of(context).surface,
+          border: Border.all(color: AppPalette.of(context).border),
         ),
         child: Row(
           children: [
@@ -137,9 +135,9 @@ class _CertificateCard extends StatelessWidget {
                     errorBuilder: (_, __, ___) => Container(
                       width: 56,
                       height: 56,
-                      color: AppColors.line,
+                      color: AppPalette.of(context).border,
                       child: Icon(Icons.description_outlined,
-                          color: AppColors.steel),
+                          color: AppPalette.of(context).secondaryText),
                     ),
                   ),
                 ),
@@ -166,7 +164,7 @@ class _CertificateCard extends StatelessWidget {
                 children: [
                   Text(certificate.name,
                       style:
-                          AppText.headline(size: 15, weight: FontWeight.w600)),
+                          AppText.headline(size: 15, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -185,33 +183,33 @@ class _CertificateCard extends StatelessWidget {
                   if (pageCount > 1) ...[
                     const SizedBox(height: 2),
                     Text('$pageCount pages',
-                        style: AppText.label(size: 10, color: AppColors.steel)),
+                        style: AppText.label(size: 10, color: AppPalette.of(context).secondaryText)),
                   ],
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: AppColors.steel),
+            Icon(Icons.chevron_right, color: AppPalette.of(context).secondaryText),
           ],
         ),
       ),
     );
   }
 
-  (Color, String) _statusInfo(Certificate cert) {
+  (Color, String) _statusInfo(BuildContext context, Certificate cert) {
     final days = cert.daysUntilExpiry;
     switch (cert.status) {
       case CertificateStatus.expired:
         return (
-          AppColors.red,
+          AppPalette.of(context).error,
           'Expired ${-days} day${-days == 1 ? '' : 's'} ago'
         );
       case CertificateStatus.expiringSoon:
         return (
-          AppColors.amberDeep,
+          AppPalette.of(context).accent,
           'Expires in $days day${days == 1 ? '' : 's'}'
         );
       case CertificateStatus.valid:
-        return (AppColors.green, 'Valid - expires in $days days');
+        return (AppPalette.of(context).success, 'Valid - expires in $days days');
     }
   }
 }
@@ -275,10 +273,10 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete certificate?', style: AppText.headline(size: 17)),
+        title: Text('Delete certificate?', style: AppText.headline(size: 17).copyWith(color: AppPalette.of(context).text)),
         content: Text(
           'This will permanently delete "${_certificate.name}" and all ${_certificate.imagePaths.length > 1 ? '${_certificate.imagePaths.length} of its saved photos' : 'its saved photo'}. This cannot be undone.',
-          style: AppText.body(size: 14),
+          style: AppText.body(size: 14, color: AppPalette.of(context).text),
         ),
         actions: [
           TextButton(
@@ -286,7 +284,7 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
               child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Delete', style: TextStyle(color: AppColors.red)),
+            child: Text('Delete', style: TextStyle(color: AppPalette.of(context).error)),
           ),
         ],
       ),
@@ -333,12 +331,10 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
     final pages = cert.imagePaths;
 
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text(cert.name, style: AppText.headline(size: 17)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: cert.name,
+        titleSize: 17,
         actions: [
           IconButton(icon: const Icon(Icons.edit_outlined), onPressed: (_deleting || _editing) ? null : _edit),
           IconButton(
@@ -353,7 +349,7 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
           children: [
             if (pages.length > 1) ...[
               Text('Page ${_pageIndex + 1} of ${pages.length}',
-                  style: AppText.label(size: 11, color: AppColors.steel)),
+                  style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
               const SizedBox(height: 6),
             ],
             ClipRRect(
@@ -391,8 +387,8 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
                       decoration: BoxDecoration(
                         border: Border.all(
                           color: index == _pageIndex
-                              ? AppColors.amberDeep
-                              : AppColors.line,
+                              ? AppPalette.of(context).accent
+                              : AppPalette.of(context).border,
                           width: index == _pageIndex ? 2 : 1,
                         ),
                       ),
@@ -404,18 +400,18 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
             ],
             const SizedBox(height: 20),
             Text('Expiry date',
-                style: AppText.label(size: 11, color: AppColors.steel)),
+                style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
             const SizedBox(height: 4),
             Text(
               '${cert.expiryDate.day.toString().padLeft(2, '0')}/${cert.expiryDate.month.toString().padLeft(2, '0')}/${cert.expiryDate.year}',
-              style: AppText.body(size: 16),
+              style: AppText.body(size: 16, color: AppPalette.of(context).text),
             ),
             if (cert.notes != null && cert.notes!.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text('Notes',
-                  style: AppText.label(size: 11, color: AppColors.steel)),
+                  style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
               const SizedBox(height: 4),
-              Text(cert.notes!, style: AppText.body(size: 14)),
+              Text(cert.notes!, style: AppText.body(size: 14, color: AppPalette.of(context).text)),
             ],
           ],
         ),

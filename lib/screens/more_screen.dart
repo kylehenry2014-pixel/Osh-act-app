@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
+import '../theme/appearance_controller.dart';
+import '../widgets/appearance_selector.dart';
 import '../data/ad_service.dart';
 import '../data/connectivity_service.dart';
 import '../data/iso_repository.dart';
 import '../data/certificates_repository.dart';
 import '../data/subscription_repository.dart';
+import 'bookmarks_screen.dart';
 import 'certificates_screen.dart';
 import 'chat_screen.dart';
 import 'sds_screen.dart';
@@ -28,6 +31,45 @@ class MoreScreen extends StatefulWidget {
 class _MoreScreenState extends State<MoreScreen> {
   static const _chatFeatureKey = 'chat';
   static const _certificatesFeatureKey = 'certificates';
+
+  bool _openingProtectedFeature = false;
+
+  bool _canContinueFeatureOpen() {
+    return mounted &&
+        ModalRoute.of(context)?.isCurrent == true &&
+        TickerMode.of(context);
+  }
+
+  Future<void> _runProtectedFeatureOpen(
+    Future<void> Function() operation,
+  ) async {
+    if (_openingProtectedFeature ||
+        !_canContinueFeatureOpen()) {
+      return;
+    }
+
+    _openingProtectedFeature = true;
+
+    try {
+      await operation();
+    } catch (error) {
+      debugPrint(
+        'Feature opening failed: ${error.runtimeType}',
+      );
+
+      if (_canContinueFeatureOpen()) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to open this feature. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _openingProtectedFeature = false;
+    }
+  }
 
   bool _bugFormOpen = false;
   final _descriptionController = TextEditingController();
@@ -101,9 +143,13 @@ class _MoreScreenState extends State<MoreScreen> {
     return online;
   }
 
-  Future<void> _openChat() async {
+  Future<void> _openChat() {
+    return _runProtectedFeatureOpen(_openChatInternal);
+  }
+
+  Future<void> _openChatInternal() async {
     if (!await _checkOnlineOrWarn('use the Safety Chat Bot')) return;
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
     if (SubscriptionRepository.instance.isPro) {
       await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => const ChatScreen(),
@@ -112,12 +158,12 @@ class _MoreScreenState extends State<MoreScreen> {
     }
     final adCount =
         await AdService.instance.nextRequiredAdCount(_chatFeatureKey);
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
     final confirmed = await _confirmWatchAds(adCount, 'ask a question');
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !_canContinueFeatureOpen()) return;
 
     final earned = await AdService.instance.watchAds(adCount);
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
 
     if (!earned) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -132,16 +178,22 @@ class _MoreScreenState extends State<MoreScreen> {
       return;
     }
     await AdService.instance.recordUnlockedRequest(_chatFeatureKey);
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
 
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => const ChatScreen(),
     ));
   }
 
-  Future<void> _openCertificates() async {
+  Future<void> _openCertificates() {
+    return _runProtectedFeatureOpen(
+      _openCertificatesInternal,
+    );
+  }
+
+  Future<void> _openCertificatesInternal() async {
     if (!await _checkOnlineOrWarn('view your certificate reminders')) return;
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
     if (SubscriptionRepository.instance.isPro) {
       await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => const CertificatesScreen(),
@@ -151,13 +203,13 @@ class _MoreScreenState extends State<MoreScreen> {
     }
     final adCount =
         await AdService.instance.nextRequiredAdCount(_certificatesFeatureKey);
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
     final confirmed =
         await _confirmWatchAds(adCount, 'view your certificate reminders');
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !_canContinueFeatureOpen()) return;
 
     final earned = await AdService.instance.watchAds(adCount);
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
 
     if (!earned) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -172,7 +224,7 @@ class _MoreScreenState extends State<MoreScreen> {
       return;
     }
     await AdService.instance.recordUnlockedRequest(_certificatesFeatureKey);
-    if (!mounted) return;
+    if (!_canContinueFeatureOpen()) return;
 
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => const CertificatesScreen(),
@@ -250,6 +302,8 @@ class _MoreScreenState extends State<MoreScreen> {
 
   IconData _featureIcon(String title) {
     switch (title) {
+      case 'Bookmarks':
+        return Icons.bookmark_rounded;
       case 'Safety Chat Bot':
         return Icons.chat_bubble_outline;
       case 'Toolbox Talks':
@@ -345,23 +399,23 @@ class _MoreScreenState extends State<MoreScreen> {
                     style: AppText.headline(
                       size: 15,
                       weight: FontWeight.w700,
-                    ),
+                    ).copyWith(color: AppPalette.of(context).text),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: AppText.body(
                       size: 12,
-                      color: AppColors.steel,
+                      color: AppPalette.of(context).secondaryText,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
-              color: _MoreStyle.bronze,
+              color: Theme.of(context).brightness == Brightness.dark ? _MoreStyle.lightGold : _MoreStyle.bronze,
               size: 24,
             ),
           ],
@@ -391,7 +445,7 @@ class _MoreScreenState extends State<MoreScreen> {
                 style: AppText.headline(
                   size: 19,
                   weight: FontWeight.w700,
-                ),
+                ).copyWith(color: AppPalette.of(context).text),
               ),
             ),
           ],
@@ -401,7 +455,7 @@ class _MoreScreenState extends State<MoreScreen> {
           subtitle,
           style: AppText.body(
             size: 12,
-            color: AppColors.steel,
+            color: AppPalette.of(context).secondaryText,
           ),
         ),
         const SizedBox(height: 15),
@@ -530,11 +584,27 @@ class _MoreScreenState extends State<MoreScreen> {
                     return _subscriptionBanner(isPro);
                   },
                 ),
+                if (kEnableAdaptiveAppearance) ...[
+                  const SizedBox(height: 18),
+                  const AppearanceSelector(),
+                ],
                 const SizedBox(height: 26),
                 _sectionTitle(
                   'Safety Tools',
                   'Your professional safety resources.',
                 ),
+                _card(
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const BookmarksScreen(),
+                      ),
+                    );
+                  },
+                  title: 'Bookmarks',
+                  subtitle: 'Access your saved legislation',
+                ),
+                const SizedBox(height: 12),
                 _card(
                   onTap: _openChat,
                   title: 'Safety Chat Bot',
@@ -646,18 +716,18 @@ class _MoreScreenState extends State<MoreScreen> {
                   comingSoon: true,
                 ),
                 const SizedBox(height: 40),
-                const Divider(color: AppColors.line),
+                Divider(color: AppPalette.of(context).border),
                 const SizedBox(height: 16),
                 Text(
                   'Text is taken from the official Acts and Regulations published in the Government Gazette. Sources include the South African Government (gov.za), LawLibrary / Laws.Africa (CC BY 4.0) and Acts Online. This app is an independent, unofficial reference tool. For legal purposes, consult the official Government Gazette.',
-                  style: AppText.label(size: 10.5),
+                  style: AppText.label(size: 10.5, color: AppPalette.of(context).secondaryText),
                 ),
                 const SizedBox(height: 14),
                 InkWell(
                   onTap: _openPrivacyPolicy,
                   child: Text(
                     'Privacy Policy',
-                    style: AppText.label(size: 12, color: AppColors.amberDeep)
+                    style: AppText.label(size: 12, color: AppPalette.of(context).accent)
                         .copyWith(decoration: TextDecoration.underline),
                   ),
                 ),
@@ -713,22 +783,22 @@ class _BugReportSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.bug_report_outlined,
-                  color: _MoreStyle.bronze,
+                  color: Theme.of(context).brightness == Brightness.dark ? _MoreStyle.lightGold : _MoreStyle.bronze,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Report a bug',
-                    style: AppText.headline(size: 14),
+                    style: AppText.headline(size: 14).copyWith(color: AppPalette.of(context).text),
                   ),
                 ),
                 Icon(
                   open
                       ? Icons.expand_less
                       : Icons.expand_more,
-                  color: _MoreStyle.bronze,
+                  color: Theme.of(context).brightness == Brightness.dark ? _MoreStyle.lightGold : _MoreStyle.bronze,
                 ),
               ],
             ),
@@ -741,25 +811,25 @@ class _BugReportSection extends StatelessWidget {
             maxLength: 2000,
             minLines: 3,
             maxLines: 6,
-            style: AppText.body(size: 14),
+            style: AppText.body(size: 14, color: AppPalette.of(context).text),
             decoration: InputDecoration(
               hintText: 'Describe the bug you found...',
               hintStyle: AppText.label(
-                  size: 12, color: AppColors.steel.withValues(alpha: 0.7)),
+                  size: 12, color: AppPalette.of(context).secondaryText.withValues(alpha: 0.7)),
               filled: true,
-              fillColor: AppColors.paperRaised,
+              fillColor: AppPalette.of(context).surface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.ink, width: 1.5),
+                borderSide: BorderSide(color: AppPalette.of(context).text, width: 1.5),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.ink, width: 1.5),
+                borderSide: BorderSide(color: AppPalette.of(context).text, width: 1.5),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: AppColors.amberDeep, width: 1.5),
+                    BorderSide(color: AppPalette.of(context).accent, width: 1.5),
               ),
             ),
           ),
@@ -770,32 +840,32 @@ class _BugReportSection extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: submitting ? null : onSubmit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.ink,
-                    foregroundColor: AppColors.paperRaised,
+                    backgroundColor: AppPalette.of(context).text,
+                    foregroundColor: AppPalette.of(context).surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: AppColors.ink, width: 1.5),
+                      side: BorderSide(color: AppPalette.of(context).text, width: 1.5),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: Text('Submit',
                       style: AppText.label(
-                          size: 11.5, color: AppColors.paperRaised)),
+                          size: 11.5, color: AppPalette.of(context).surface)),
                 ),
               ),
               const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: submitting ? null : onCancel,
                 style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.paperRaised,
-                  side: const BorderSide(color: AppColors.ink, width: 1.5),
+                  backgroundColor: AppPalette.of(context).surface,
+                  side: BorderSide(color: AppPalette.of(context).text, width: 1.5),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                   padding:
                       const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
                 ),
                 child: Text('Cancel',
-                    style: AppText.label(size: 11.5, color: AppColors.ink)),
+                    style: AppText.label(size: 11.5, color: AppPalette.of(context).text)),
               ),
             ],
           ),
@@ -805,7 +875,7 @@ class _BugReportSection extends StatelessWidget {
               statusMessage!,
               style: AppText.label(
                   size: 11,
-                  color: statusIsError ? AppColors.red : AppColors.amberDeep),
+                  color: statusIsError ? AppPalette.of(context).error : AppPalette.of(context).accent),
             ),
           ],
         ],
@@ -887,68 +957,36 @@ class _MoreHeader extends StatelessWidget {
       decoration: const BoxDecoration(
         gradient: _MoreStyle.darkGradient,
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
-            child: Row(
+            padding: EdgeInsets.fromLTRB(22, 16, 22, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'OHS ACT & REGULATIONS',
-                        style: TextStyle(
-                          color: _MoreStyle.lightGold,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.7,
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        'More',
-                        style: AppText.headline(
-                          size: 27,
-                          weight: FontWeight.w800,
-                        ).copyWith(
-                          color: _MoreStyle.cream,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Your professional safety companion',
-                        style: TextStyle(
-                          color: Color(0xFFD6D2C5),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                Text(
+                  'OHS ACT & REGULATIONS',
+                  style: TextStyle(
+                    color: _MoreStyle.lightGold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.3,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: _MoreStyle.darkGradient,
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(
-                      color: _MoreStyle.gold,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.grid_view_rounded,
-                    color: _MoreStyle.lightGold,
-                    size: 25,
+                SizedBox(height: 6),
+                Text(
+                  'Your professional safety companion',
+                  style: TextStyle(
+                    color: Color(0xFFD6D2C5),
+                    fontSize: 12,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
-          const _MoreTape(),
+          _MoreTape(),
         ],
       ),
     );
@@ -1014,7 +1052,8 @@ class _MorePressCardState extends State<_MorePressCard> {
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            gradient: widget.dark
+            gradient: widget.dark ||
+                    Theme.of(context).brightness == Brightness.dark
                 ? _MoreStyle.darkGradient
                 : _MoreStyle.creamGradient,
             borderRadius: BorderRadius.circular(radius - 1),

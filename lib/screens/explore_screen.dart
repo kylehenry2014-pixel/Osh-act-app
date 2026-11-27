@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../data/ad_service.dart';
+
+import '../data/legislation_access_service.dart';
 import '../data/entries_repository.dart';
-import '../data/subscription_repository.dart';
 import '../models/entry.dart';
 import '../theme/app_theme.dart';
 import 'detail_screen.dart';
@@ -15,7 +15,6 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class ExploreScreenState extends State<ExploreScreen> {
-  static const _sectionOpenFeatureKey = 'act_section_open';
 
   final _repo = EntriesRepository.instance;
   final _searchController = TextEditingController();
@@ -62,26 +61,6 @@ class ExploreScreenState extends State<ExploreScreen> {
     return false;
   }
 
-  Future<bool?> _confirmWatchAd() {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Watch an ad to continue'),
-        content: const Text('Watch a short ad to open this section.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Watch'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _openEntry(
     Entry entry,
     List<Entry> pagingList,
@@ -93,65 +72,18 @@ class ExploreScreenState extends State<ExploreScreen> {
     final entries = List<Entry>.unmodifiable(pagingList);
 
     try {
-      if (!SubscriptionRepository.instance.isPro) {
-        final adCount = await AdService.instance
-            .nextRequiredAdCount(_sectionOpenFeatureKey);
-
-        if (!mounted) return;
-
-        final confirmed = await _confirmWatchAd();
-
-        if (!mounted || confirmed != true) return;
-
-        final earned =
-            await AdService.instance.watchAds(adCount);
-
-        if (!mounted) return;
-
-        if (!earned) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            const SnackBar(
-              content: Text(
-                "You'll need to watch the ad through "
-                "to the end to open this section.",
+      await LegislationAccessService.instance.open(
+        context: context,
+        onOpen: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DetailScreen(
+                entries: entries,
+                initialId: entry.id,
               ),
             ),
           );
-
-          return;
-        }
-
-        await AdService.instance.recordUnlockedRequest(
-          _sectionOpenFeatureKey,
-        );
-
-        if (!mounted) return;
-      }
-
-      if (!mounted ||
-          ModalRoute.of(context)?.isCurrent != true) {
-        return;
-      }
-
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DetailScreen(
-            entries: entries,
-            initialId: entry.id,
-          ),
-        ),
-      );
-    } catch (error) {
-      debugPrint('Unable to open legislation: $error');
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to open this section. Please try again.',
-          ),
-        ),
+        },
       );
     } finally {
       _openingEntry = false;
@@ -195,7 +127,9 @@ class ExploreScreenState extends State<ExploreScreen> {
             },
           ),
           if (query.isEmpty) _buildBreadcrumb(),
-          Expanded(child: _buildBody(query)),
+          Expanded(
+            child: _buildAnimatedBody(query),
+          ),
         ],
       ),
     );
@@ -232,14 +166,69 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   Widget _arrow() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Text('›', style: AppText.label(size: 12)),
+        child: Text('›', style: AppText.label(size: 12, color: AppPalette.of(context).secondaryText)),
       );
 
   Widget _crumb(String text, VoidCallback? onTap, {required bool isLink}) {
     final style = AppText.label(
-        size: 12, color: isLink ? AppColors.amberDeep : AppColors.steel);
+        size: 12, color: isLink ? AppPalette.of(context).accent : AppPalette.of(context).secondaryText);
     if (!isLink || onTap == null) return Text(text, style: style);
     return InkWell(onTap: onTap, child: Text(text, style: style));
+  }
+
+  Widget _buildAnimatedBody(String query) {
+    final reducedMotion =
+        MediaQuery.of(context).disableAnimations;
+
+    final Object pageIdentity = query.isNotEmpty
+        ? const ('search',)
+        : ('browse', _browseCategory, _browseCollection);
+
+    final duration = reducedMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+
+    return ClipRect(
+      child: AnimatedSwitcher(
+        duration: duration,
+        reverseDuration: Duration.zero,
+        switchInCurve: Curves.easeOutCubic,
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              for (final child in previousChildren)
+                IgnorePointer(
+                  child: ExcludeSemantics(child: child),
+                ),
+              if (currentChild != null) currentChild,
+            ],
+          );
+        },
+        transitionBuilder: (child, animation) {
+          if (reducedMotion) return child;
+
+          return FadeTransition(
+            opacity: animation.drive(
+              Tween<double>(begin: 0.85, end: 1),
+            ),
+            child: SlideTransition(
+              position: animation.drive(
+                Tween<Offset>(
+                  begin: const Offset(0, 0.008),
+                  end: Offset.zero,
+                ),
+              ),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(
+          key: PageStorageKey<Object>(pageIdentity),
+          child: _buildBody(query),
+        ),
+      ),
+    );
   }
 
   Widget _buildBody(String query) {
@@ -289,43 +278,60 @@ class _Masthead extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = EntriesRepository.instance.all.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const HazardStripe(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Republic of South Africa',
-                      style: AppText.label(size: 10.5)),
-                  Text('OHS Act & Regs', style: AppText.label(size: 10.5)),
+
+    return PremiumHeaderSurface(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'REPUBLIC OF SOUTH AFRICA',
+              style: AppText.label(
+                size: 10,
+                color: AppColors.amber,
+              ).copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text.rich(
+              TextSpan(
+                style: AppText.headline(size: 26).copyWith(
+                  color: AppColors.paperRaised,
+                ),
+                children: const [
+                  TextSpan(text: 'OHS Act '),
+                  TextSpan(
+                    text: '&',
+                    style: TextStyle(
+                      color: PremiumHeaderSurface.gold,
+                    ),
+                  ),
+                  TextSpan(text: ' Regulations'),
                 ],
               ),
-              const SizedBox(height: 10),
-              RichText(
-                text: TextSpan(
-                  style: AppText.headline(size: 26),
-                  children: [
-                    const TextSpan(text: 'OHS Act '),
-                    TextSpan(
-                        text: '&',
-                        style: TextStyle(color: AppColors.amberDeep)),
-                    const TextSpan(text: ' Regulations'),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$total sections & regulations',
+              style: AppText.label(
+                size: 12,
+                color: PremiumHeaderSurface.muted,
               ),
-              const SizedBox(height: 4),
-              Text('$total sections & regulations · search or browse below',
-                  style: AppText.label(size: 12)),
-            ],
-          ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Search or browse below',
+              style: AppText.label(
+                size: 11,
+                color: PremiumHeaderSurface.muted,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -348,18 +354,18 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.paper,
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+      color: AppPalette.of(context).background,
+      padding: const EdgeInsets.fromLTRB(22, 12, 22, 10),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.paperRaised,
-          border: Border.all(color: AppColors.ink, width: 1.5),
+          color: AppPalette.of(context).surface,
+          border: Border.all(color: AppPalette.of(context).text, width: 1.5),
           borderRadius: BorderRadius.circular(2),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            const Icon(Icons.search, size: 18, color: AppColors.steel),
+            Icon(Icons.search, size: 18, color: AppPalette.of(context).secondaryText),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -367,14 +373,14 @@ class _SearchField extends StatelessWidget {
                 focusNode: focusNode,
                 autofocus: autoFocus,
                 onChanged: onChanged,
-                style: AppText.label(size: 15, color: AppColors.ink),
+                style: AppText.label(size: 15, color: AppPalette.of(context).text),
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   hintText: 'Search a topic, or jump with a code like "CR 8"',
                   hintStyle: AppText.label(
-                      size: 13, color: AppColors.steel.withValues(alpha: 0.7)),
+                      size: 13, color: AppPalette.of(context).secondaryText.withValues(alpha: 0.7)),
                 ),
               ),
             ),
@@ -384,7 +390,7 @@ class _SearchField extends StatelessWidget {
                 if (controller.text.isEmpty) return const SizedBox.shrink();
                 return TextButton(
                   onPressed: onClear,
-                  child: Text('CLEAR', style: AppText.label(size: 11)),
+                  child: Text('CLEAR', style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
                 );
               },
             ),
@@ -448,7 +454,7 @@ class _HomeGrid extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(6, 8, 6, 4),
           child: Text('ACTS',
-              style: AppText.label(size: 11, color: AppColors.amberDeep)),
+              style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
         ),
         _BrowseCard(
           title: 'Occupational Health and Safety Act',
@@ -467,7 +473,7 @@ class _HomeGrid extends StatelessWidget {
               subtitle: available ? '$count sections' : 'Coming soon',
               onTap: available
                   ? () => onSelectAct('OtherActs', collection!)
-                  : () {},
+                  : null,
             ),
           );
         }),
@@ -508,7 +514,7 @@ class _OhsActMenu extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(6, 20, 6, 4),
           child: Text('REGULATIONS',
-              style: AppText.label(size: 11, color: AppColors.amberDeep)),
+              style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
         ),
         ...regCategories.map((cat) {
           final count = repo.countInCategory(cat);
@@ -554,23 +560,34 @@ class _CollectionGrid extends StatelessWidget {
 class _BrowseCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   const _BrowseCard(
       {required this.title, required this.subtitle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.paperRaised,
-          border: Border.all(color: AppColors.line),
-          borderRadius: BorderRadius.circular(2),
-        ),
-        child: Row(
+    final palette = AppPalette.of(context);
+    final radius = BorderRadius.circular(2);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: palette.surface,
+            border: Border.all(color: palette.border),
+            borderRadius: radius,
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: radius,
+            splashColor: palette.accent.withValues(alpha: 0.18),
+            highlightColor: palette.accent.withValues(alpha: 0.10),
+            focusColor: palette.accent.withValues(alpha: 0.14),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
           children: [
             Expanded(
               child: Column(
@@ -578,14 +595,17 @@ class _BrowseCard extends StatelessWidget {
                 children: [
                   Text(title,
                       style:
-                          AppText.headline(size: 16, weight: FontWeight.w600)),
+                          AppText.headline(size: 16, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
                   const SizedBox(height: 3),
-                  Text(subtitle, style: AppText.label(size: 11)),
+                  Text(subtitle, style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward, size: 18, color: AppColors.steel),
-          ],
+            Icon(Icons.arrow_forward, size: 18, color: AppPalette.of(context).secondaryText),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -604,7 +624,7 @@ class _SectionList extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 24),
       itemCount: items.length,
       separatorBuilder: (_, __) =>
-          const Divider(height: 1, color: AppColors.line),
+          Divider(height: 1, color: AppPalette.of(context).border),
       itemBuilder: (context, i) =>
           _SectionRow(entry: items[i], onTap: () => onTap(items[i])),
     );
@@ -637,13 +657,13 @@ class _SearchResultsList extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 16, 22, 4),
                 child: Text(kCategoryLabel[entry.category] ?? entry.category,
-                    style: AppText.label(size: 11, color: AppColors.amberDeep)),
+                    style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
               ),
             if (showCollectionHeader)
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 2, 22, 6),
                 child: Text(entry.collection,
-                    style: AppText.headline(size: 14, weight: FontWeight.w600)),
+                    style: AppText.headline(size: 14, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
               ),
             _SectionRow(entry: entry, onTap: () => onTap(entry)),
           ],
@@ -665,6 +685,9 @@ class _SectionRow extends StatelessWidget {
         snippet.length > 140 ? '${snippet.substring(0, 140)}…' : snippet;
     return InkWell(
       onTap: onTap,
+      splashColor: AppPalette.of(context).accent.withValues(alpha: 0.18),
+      highlightColor: AppPalette.of(context).accent.withValues(alpha: 0.10),
+      focusColor: AppPalette.of(context).accent.withValues(alpha: 0.14),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
         child: Row(
@@ -675,10 +698,10 @@ class _SectionRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 4),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.ink, width: 1),
+                border: Border.all(color: AppPalette.of(context).text, width: 1),
               ),
               child: Text(entry.num,
-                  style: AppText.label(size: 11, color: AppColors.ink)),
+                  style: AppText.label(size: 11, color: AppPalette.of(context).text)),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -687,10 +710,10 @@ class _SectionRow extends StatelessWidget {
                 children: [
                   Text(entry.title,
                       style: AppText.headline(
-                          size: 15.5, weight: FontWeight.w600)),
+                          size: 15.5, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
                   const SizedBox(height: 3),
                   Text(trimmed,
-                      style: AppText.body(size: 13, color: AppColors.steel),
+                      style: AppText.body(size: 13, color: AppPalette.of(context).secondaryText),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis),
                 ],
@@ -714,7 +737,7 @@ class _EmptyState extends StatelessWidget {
         child: Text(
           'No sections match that search.\nTry a different word, or a section number.',
           textAlign: TextAlign.center,
-          style: AppText.label(size: 13),
+          style: AppText.label(size: 13, color: AppPalette.of(context).secondaryText),
         ),
       ),
     );

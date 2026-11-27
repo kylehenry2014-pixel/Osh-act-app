@@ -256,7 +256,7 @@ class _DetailScreenState extends State<DetailScreen> {
     final showLanguageNote = _translations.currentLanguage != 'en';
 
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: AppPalette.of(context).background,
       body: SafeArea(
         child: Column(
           children: [
@@ -270,9 +270,9 @@ class _DetailScreenState extends State<DetailScreen> {
             Expanded(
               child: TextSelectionTheme(
                 data: TextSelectionTheme.of(context).copyWith(
-                  cursorColor: AppColors.amberDeep,
+                  cursorColor: AppPalette.of(context).accent,
                   selectionColor: AppColors.amber.withValues(alpha: 0.35),
-                  selectionHandleColor: AppColors.amberDeep,
+                  selectionHandleColor: AppPalette.of(context).accent,
                 ),
                 child: SelectionArea(
                   key: ValueKey(
@@ -290,25 +290,25 @@ class _DetailScreenState extends State<DetailScreen> {
                               entry.collection,
                               style: AppText.label(
                                 size: 12,
-                                color: AppColors.amberDeep,
+                                color: AppPalette.of(context).accent,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Section / Regulation ${entry.num}',
-                              style: AppText.label(size: 11),
+                              style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               displayTitle,
-                              style: AppText.headline(size: 22),
+                              style: AppText.headline(size: 22).copyWith(color: AppPalette.of(context).text),
                             ),
                           ],
                         ),
                       ),
-                      const Divider(
+                      Divider(
                         height: 1,
-                        color: AppColors.lineStrong,
+                        color: AppPalette.of(context).strongBorder,
                       ),
                       Expanded(
                         child: ListView(
@@ -325,7 +325,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                 padding: const EdgeInsets.only(bottom: 14),
                                 child: Text(
                                   p,
-                                  style: AppText.body(),
+                                  style: AppText.body(color: AppPalette.of(context).text),
                                 ),
                               ),
                             ),
@@ -367,6 +367,7 @@ class _BackBar extends StatelessWidget {
   final VoidCallback onBookmarkTap;
   final bool isSpeaking;
   final VoidCallback onSpeechTap;
+
   const _BackBar({
     required this.onTap,
     required this.bookmarked,
@@ -377,50 +378,69 @@ class _BackBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.line)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                child: Row(
-                  children: [
-                    const Icon(Icons.arrow_back, size: 16, color: AppColors.ink),
-                    const SizedBox(width: 8),
-                    Text('BACK', style: AppText.label(size: 12, color: AppColors.ink)),
-                  ],
+    return PremiumHeaderSurface(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Text(
+                'LEGISLATION READER',
+                style: AppText.label(
+                  size: 10,
+                  color: AppColors.amber,
+                ).copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.1,
                 ),
               ),
             ),
-          ),
-          InkWell(
-            onTap: onSpeechTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Icon(
-                isSpeaking ? Icons.stop_circle_outlined : Icons.volume_up_outlined,
-                size: 20,
-                color: isSpeaking ? AppColors.amberDeep : AppColors.ink,
-              ),
+            Row(
+              children: [
+                PremiumHeaderButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onPressed: onTap,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Read legislation',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.headline(size: 16).copyWith(
+                      color: AppColors.paperRaised,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                PremiumHeaderButton(
+                  icon: isSpeaking
+                      ? Icons.stop_circle_outlined
+                      : Icons.volume_up_rounded,
+                  tooltip: isSpeaking
+                      ? 'Stop reading'
+                      : 'Read aloud',
+                  onPressed: onSpeechTap,
+                  active: isSpeaking,
+                ),
+                const SizedBox(width: 8),
+                PremiumHeaderButton(
+                  icon: bookmarked
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  tooltip: bookmarked
+                      ? 'Remove bookmark'
+                      : 'Save bookmark',
+                  onPressed: onBookmarkTap,
+                  active: bookmarked,
+                ),
+              ],
             ),
-          ),
-          InkWell(
-            onTap: onBookmarkTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-              child: Icon(
-                bookmarked ? Icons.bookmark : Icons.bookmark_border,
-                size: 20,
-                color: bookmarked ? AppColors.amberDeep : AppColors.ink,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -436,14 +456,14 @@ class _LanguageNote extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.paperRaised,
-        border: Border.all(color: AppColors.line),
+        color: AppPalette.of(context).surface,
+        border: Border.all(color: AppPalette.of(context).border),
       ),
       child: Text(
         isTranslated
             ? 'This is an unofficial translation provided for convenience. Only the English text is legally authoritative.'
             : 'Not yet translated into this language - showing the official English text.',
-        style: AppText.label(size: 11, color: AppColors.steel),
+        style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText),
       ),
     );
   }
@@ -468,17 +488,17 @@ class _NotesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(color: AppColors.line),
+        Divider(color: AppPalette.of(context).border),
         const SizedBox(height: 8),
         InkWell(
           onTap: onToggle,
           child: Row(
             children: [
-              Icon(Icons.edit_note, size: 18, color: AppColors.steel),
+              Icon(Icons.edit_note, size: 18, color: AppPalette.of(context).secondaryText),
               const SizedBox(width: 6),
               Text(
                 hasNote ? 'My note' : 'Add a note',
-                style: AppText.label(size: 12, color: AppColors.steel),
+                style: AppText.label(size: 12, color: AppPalette.of(context).secondaryText),
               ),
             ],
           ),
@@ -490,29 +510,29 @@ class _NotesSection extends StatelessWidget {
             onChanged: onChanged,
             minLines: 2,
             maxLines: 6,
-            style: AppText.body(size: 14),
+            style: AppText.body(size: 14, color: AppPalette.of(context).text),
             decoration: InputDecoration(
               hintText: 'How does this apply to your site or company...',
-              hintStyle: AppText.label(size: 12, color: AppColors.steel.withValues(alpha: 0.7)),
+              hintStyle: AppText.label(size: 12, color: AppPalette.of(context).secondaryText.withValues(alpha: 0.7)),
               filled: true,
-              fillColor: AppColors.paperRaised,
+              fillColor: AppPalette.of(context).surface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(2),
-                borderSide: const BorderSide(color: AppColors.ink, width: 1.5),
+                borderSide: BorderSide(color: AppPalette.of(context).text, width: 1.5),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(2),
-                borderSide: const BorderSide(color: AppColors.ink, width: 1.5),
+                borderSide: BorderSide(color: AppPalette.of(context).text, width: 1.5),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(2),
-                borderSide: const BorderSide(color: AppColors.amberDeep, width: 1.5),
+                borderSide: BorderSide(color: AppPalette.of(context).accent, width: 1.5),
               ),
             ),
           ),
         ] else if (hasNote) ...[
           const SizedBox(height: 6),
-          Text(controller.text, style: AppText.body(size: 13, color: AppColors.steel), maxLines: 2, overflow: TextOverflow.ellipsis),
+          Text(controller.text, style: AppText.body(size: 13, color: AppPalette.of(context).secondaryText), maxLines: 2, overflow: TextOverflow.ellipsis),
         ],
       ],
     );
@@ -538,27 +558,43 @@ class _PrevNextBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
       child: Row(
         children: [
-          Expanded(child: _navButton('← PREVIOUS', canPrev, onPrev)),
+          Expanded(child: _navButton(context, '← PREVIOUS', canPrev, onPrev)),
           const SizedBox(width: 12),
-          Expanded(child: _navButton('NEXT →', canNext, onNext)),
+          Expanded(child: _navButton(context, 'NEXT →', canNext, onNext)),
         ],
       ),
     );
   }
 
-  Widget _navButton(String label, bool enabled, VoidCallback onTap) {
+  Widget _navButton(BuildContext context, String label, bool enabled, VoidCallback onTap) {
+    final palette = AppPalette.of(context);
+
     return Opacity(
       opacity: enabled ? 1 : 0.3,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          alignment: Alignment.center,
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
           decoration: BoxDecoration(
-            color: AppColors.paperRaised,
-            border: Border.all(color: AppColors.ink, width: 1.5),
+            color: palette.surface,
+            border: Border.all(color: palette.text, width: 1.5),
           ),
-          child: Text(label, style: AppText.label(size: 12)),
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            splashColor: palette.accent.withValues(alpha: 0.18),
+            highlightColor: palette.accent.withValues(alpha: 0.10),
+            focusColor: palette.accent.withValues(alpha: 0.14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: AppText.label(
+                  size: 12,
+                  color: palette.secondaryText,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

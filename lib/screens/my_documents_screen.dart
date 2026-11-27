@@ -129,12 +129,12 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
         builder: (dialogContext) => AlertDialog(
           title: Text(
             'Delete "${document.name}"?',
-            style: AppText.headline(size: 17),
+            style: AppText.headline(size: 17).copyWith(color: AppPalette.of(dialogContext).text),
           ),
           content: Text(
             'This removes your saved copy. You can save it '
             'again later if you still have the original download.',
-            style: AppText.body(size: 14),
+            style: AppText.body(size: 14, color: AppPalette.of(context).text),
           ),
           actions: [
             TextButton(
@@ -147,7 +147,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                   Navigator.of(dialogContext).pop(true),
               child: Text(
                 'Delete',
-                style: TextStyle(color: AppColors.red),
+                style: TextStyle(color: AppPalette.of(dialogContext).error),
               ),
             ),
           ],
@@ -182,13 +182,13 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             Icon(
               Icons.error_outline,
               size: 40,
-              color: AppColors.steel,
+              color: AppPalette.of(context).secondaryText,
             ),
             const SizedBox(height: 16),
             Text(
               _loadError!,
               textAlign: TextAlign.center,
-              style: AppText.body(size: 14),
+              style: AppText.body(size: 14, color: AppPalette.of(context).text),
             ),
             const SizedBox(height: 12),
             TextButton(
@@ -208,17 +208,15 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final documents = SavedDocumentsRepository.instance.all;
 
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('My Documents', style: AppText.headline(size: 18)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'My Documents',
+        titleSize: 18,
       ),
       body: _loading
-          ? const Center(
+          ? Center(
               child: CircularProgressIndicator(
-                color: AppColors.amberDeep,
+                color: AppPalette.of(context).accent,
               ),
             )
           : _loadError != null
@@ -231,12 +229,12 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.folder_open_outlined,
-                        size: 40, color: AppColors.steel),
+                        size: 40, color: AppPalette.of(context).secondaryText),
                     const SizedBox(height: 16),
                     Text(
                       'No documents saved yet. Save a checklist or toolbox talk to keep a permanent copy here.',
                       textAlign: TextAlign.center,
-                      style: AppText.body(size: 14, color: AppColors.steel),
+                      style: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
                     ),
                   ],
                 ),
@@ -253,13 +251,13 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AppColors.paperRaised,
-                      border: Border.all(color: AppColors.line),
+                      color: AppPalette.of(context).surface,
+                      border: Border.all(color: AppPalette.of(context).border),
                     ),
                     child: Row(
                       children: [
                         Icon(Icons.description_outlined,
-                            color: AppColors.steel),
+                            color: AppPalette.of(context).secondaryText),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -267,16 +265,16 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                             children: [
                               Text(document.name,
                                   style: AppText.headline(
-                                      size: 15, weight: FontWeight.w600)),
+                                      size: 15, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
                               const SizedBox(height: 3),
                               Text(document.category,
-                                  style: AppText.label(size: 11)),
+                                  style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
                             ],
                           ),
                         ),
                         IconButton(
                           icon: Icon(Icons.delete_outline,
-                              color: AppColors.steel),
+                              color: AppPalette.of(context).secondaryText),
                           onPressed: _operationBusy ? null : () => _confirmDelete(document),
                         ),
                       ],

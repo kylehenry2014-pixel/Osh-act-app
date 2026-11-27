@@ -150,7 +150,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context)
               .colorScheme
-              .copyWith(primary: AppColors.amberDeep),
+              .copyWith(primary: AppPalette.of(context).accent, onPrimary: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white),
         ),
         child: child!,
       ),
@@ -271,19 +271,16 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
         automaticallyImplyLeading: false,
         leading: BackButton(
           onPressed: () {
             if (!_saving) Navigator.of(context).maybePop();
           },
         ),
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text(_isEditing ? 'Edit Certificate' : 'Add Certificate',
-            style: AppText.headline(size: 18)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+        title: _isEditing ? 'Edit Certificate' : 'Add Certificate',
+        titleSize: 18,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -299,18 +296,18 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
             ),
             const SizedBox(height: 20),
             Text('Certificate name',
-                style: AppText.label(size: 11, color: AppColors.steel)),
+                style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
             const SizedBox(height: 6),
             TextField(
               controller: _nameController,
               enabled: !_saving && !_picking,
-              style: AppText.body(size: 15),
+              style: AppText.body(size: 15, color: AppPalette.of(context).text),
               decoration: _inputDecoration(
                   'e.g. Fire Equipment Service, Medical Certificate'),
             ),
             const SizedBox(height: 20),
             Text('Expiry date',
-                style: AppText.label(size: 11, color: AppColors.steel)),
+                style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
             const SizedBox(height: 6),
             InkWell(
               onTap: (_saving || _picking) ? null : _pickExpiryDate,
@@ -319,13 +316,13 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 decoration: BoxDecoration(
-                  color: AppColors.paperRaised,
-                  border: Border.all(color: AppColors.line),
+                  color: AppPalette.of(context).surface,
+                  border: Border.all(color: AppPalette.of(context).border),
                 ),
                 child: Row(
                   children: [
                     Icon(Icons.calendar_today_outlined,
-                        size: 18, color: AppColors.steel),
+                        size: 18, color: AppPalette.of(context).secondaryText),
                     const SizedBox(width: 10),
                     Text(
                       _expiryDate == null
@@ -334,8 +331,8 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                       style: AppText.body(
                           size: 15,
                           color: _expiryDate == null
-                              ? AppColors.steel
-                              : AppColors.ink),
+                              ? AppPalette.of(context).secondaryText
+                              : AppPalette.of(context).text),
                     ),
                   ],
                 ),
@@ -343,12 +340,12 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
             ),
             const SizedBox(height: 20),
             Text('Notes (optional)',
-                style: AppText.label(size: 11, color: AppColors.steel)),
+                style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
             const SizedBox(height: 6),
             TextField(
               controller: _notesController,
               enabled: !_saving && !_picking,
-              style: AppText.body(size: 15),
+              style: AppText.body(size: 15, color: AppPalette.of(context).text),
               maxLines: 3,
               decoration: _inputDecoration(
                   'Any extra details, e.g. issuing body or reference number'),
@@ -356,7 +353,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
             if (_error != null) ...[
               const SizedBox(height: 16),
               Text(_error!,
-                  style: AppText.label(size: 12, color: AppColors.red)),
+                  style: AppText.label(size: 12, color: AppPalette.of(context).error)),
             ],
             const SizedBox(height: 28),
             SizedBox(
@@ -364,18 +361,18 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
               child: ElevatedButton(
                 onPressed: (_saving || _picking) ? null : _save,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.amberDeep,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppPalette.of(context).accent,
+                  foregroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(2)),
                 ),
                 child: _saving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
+                            strokeWidth: 2, color: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white))
                     : Text(_isEditing ? 'Save Changes' : 'Save Certificate'),
               ),
             ),
@@ -388,20 +385,20 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
 
   InputDecoration _inputDecoration(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: AppText.body(size: 14, color: AppColors.steel),
+        hintStyle: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
         filled: true,
-        fillColor: AppColors.paperRaised,
+        fillColor: AppPalette.of(context).surface,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.zero,
-            borderSide: BorderSide(color: AppColors.line)),
+            borderSide: BorderSide(color: AppPalette.of(context).border)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.zero,
-            borderSide: BorderSide(color: AppColors.line)),
+            borderSide: BorderSide(color: AppPalette.of(context).border)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.zero,
-            borderSide: BorderSide(color: AppColors.amberDeep)),
+            borderSide: BorderSide(color: AppPalette.of(context).accent)),
       );
 }
 
@@ -428,11 +425,11 @@ class _PagesPicker extends StatelessWidget {
         Row(
           children: [
             Text('Photos',
-                style: AppText.label(size: 11, color: AppColors.steel)),
+                style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
             if (imagePaths.length > 1) ...[
               const SizedBox(width: 6),
               Text('(${imagePaths.length} pages)',
-                  style: AppText.label(size: 11, color: AppColors.amberDeep)),
+                  style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
             ],
           ],
         ),
@@ -442,11 +439,11 @@ class _PagesPicker extends StatelessWidget {
             height: 140,
             width: double.infinity,
             decoration: BoxDecoration(
-                color: AppColors.paperRaised,
-                border: Border.all(color: AppColors.line)),
+                color: AppPalette.of(context).surface,
+                border: Border.all(color: AppPalette.of(context).border)),
             child: Center(
               child: Icon(Icons.description_outlined,
-                  size: 36, color: AppColors.steel),
+                  size: 36, color: AppPalette.of(context).secondaryText),
             ),
           )
         else
@@ -472,8 +469,8 @@ class _PagesPicker extends StatelessWidget {
                 icon: const Icon(Icons.camera_alt_outlined, size: 18),
                 label: Text(imagePaths.isEmpty ? 'Take Photo' : 'Add Page'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.ink,
-                  side: BorderSide(color: AppColors.line),
+                  foregroundColor: AppPalette.of(context).text,
+                  side: BorderSide(color: AppPalette.of(context).border),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(2)),
@@ -487,8 +484,8 @@ class _PagesPicker extends StatelessWidget {
                 icon: const Icon(Icons.upload_outlined, size: 18),
                 label: const Text('Upload'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.ink,
-                  side: BorderSide(color: AppColors.line),
+                  foregroundColor: AppPalette.of(context).text,
+                  side: BorderSide(color: AppPalette.of(context).border),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(2)),
@@ -501,7 +498,7 @@ class _PagesPicker extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'You can select multiple photos from Upload at once, or add pages one at a time with Take Photo / Add Page.',
-            style: AppText.label(size: 10, color: AppColors.steel),
+            style: AppText.label(size: 10, color: AppPalette.of(context).secondaryText),
           ),
         ],
       ],
@@ -526,16 +523,16 @@ class _PageThumbnail extends StatelessWidget {
         Container(
           width: 90,
           height: 110,
-          decoration: BoxDecoration(border: Border.all(color: AppColors.line)),
+          decoration: BoxDecoration(border: Border.all(color: AppPalette.of(context).border)),
           child: Image.file(
             File(imagePath),
             fit: BoxFit.cover,
             width: 90,
             height: 110,
-            errorBuilder: (_, __, ___) => const Center(
+            errorBuilder: (_, __, ___) => Center(
               child: Icon(
                 Icons.broken_image_outlined,
-                color: AppColors.steel,
+                color: AppPalette.of(context).secondaryText,
               ),
             ),
           ),

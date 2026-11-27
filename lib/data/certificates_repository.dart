@@ -26,6 +26,7 @@ class CertificatesRepository {
   List<Certificate> _certificates = [];
 
   bool _loaded = false;
+  bool _reloadRequired = false;
   Future<void>? _loading;
 
   Future<void> _operationQueue = Future<void>.value();
@@ -77,10 +78,15 @@ class CertificatesRepository {
     final prefs =
         await SharedPreferences.getInstance();
 
+    if (_reloadRequired) {
+      await prefs.reload();
+    }
+
     final raw = prefs.getString(_storageKey);
 
     if (raw == null || raw.isEmpty) {
       _certificates = [];
+      _reloadRequired = false;
       _loaded = true;
       return;
     }
@@ -105,6 +111,7 @@ class CertificatesRepository {
       }).toList();
 
       _certificates = certificates;
+      _reloadRequired = false;
       _loaded = true;
     } catch (error) {
       // Never overwrite unreadable certificate data.
@@ -568,6 +575,13 @@ class CertificatesRepository {
   Future<void> _deleteUnusedFiles(
     Iterable<String> paths,
   ) async {
+    if (_reloadRequired || !_loaded) {
+      debugPrint(
+        'Certificate image cleanup deferred pending storage recovery.',
+      );
+      return;
+    }
+
     final referenced = _certificates
         .expand((certificate) => certificate.imagePaths)
         .toSet();
@@ -632,15 +646,29 @@ class CertificatesRepository {
       }).toList(),
     );
 
-    final saved = await prefs.setString(
-      _storageKey,
-      encoded,
-    );
-
-    if (!saved) {
-      throw StateError(
-        'Certificate changes could not be saved.',
+    try {
+      final saved = await prefs.setString(
+        _storageKey,
+        encoded,
       );
+
+      if (!saved) {
+        throw StateError(
+          'Certificate changes could not be saved.',
+        );
+      }
+    } catch (_) {
+      // The platform may have persisted the metadata
+      // even though the write reported a failure.
+      // Preserve all images until storage is reloaded.
+      _loaded = false;
+      _reloadRequired = true;
+
+      debugPrint(
+        'Certificate metadata write requires recovery.',
+      );
+
+      rethrow;
     }
 
     // Update memory only after successful persistence.

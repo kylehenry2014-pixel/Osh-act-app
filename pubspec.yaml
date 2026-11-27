@@ -69,8 +69,12 @@ flutter:
     - assets/fonts/LICENSE.txt
 
 flutter_native_splash:
-  background_image: assets/splash/splash_background.png
+  color: "#1B1E19"
+  color_dark: "#1B1E19"
   android_12:
-    color: "#DA9B2A"
+    color: "#1B1E19"
+    color_dark: "#1B1E19"
+    image: assets/splash/transparent_splash.png
+    image_dark: assets/splash/transparent_splash.png
   ios: false
   web: false

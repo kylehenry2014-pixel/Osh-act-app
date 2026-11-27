@@ -217,12 +217,10 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('Safety Chat Bot', style: AppText.headline(size: 20)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'Safety Chat Bot',
+        titleSize: 20,
       ),
       body: Column(
         children: [
@@ -247,7 +245,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: (_errorIsQuota ? AppColors.amberDeep : AppColors.red)
+              color: (_errorIsQuota ? AppPalette.of(context).accent : AppPalette.of(context).error)
                   .withValues(alpha: 0.1),
               child: Row(
                 children: [
@@ -256,7 +254,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ? Icons.hourglass_bottom
                         : Icons.error_outline,
                     size: 16,
-                    color: _errorIsQuota ? AppColors.amberDeep : AppColors.red,
+                    color: _errorIsQuota ? AppPalette.of(context).accent : AppPalette.of(context).error,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -265,7 +263,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       style: AppText.label(
                         size: 12,
                         color:
-                            _errorIsQuota ? AppColors.amberDeep : AppColors.red,
+                            _errorIsQuota ? AppPalette.of(context).accent : AppPalette.of(context).error,
                       ),
                     ),
                   ),
@@ -319,11 +317,11 @@ class _WelcomeCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.forum_outlined, size: 40, color: AppColors.steel),
+            Icon(Icons.forum_outlined, size: 40, color: AppPalette.of(context).secondaryText),
             const SizedBox(height: 16),
             Text(text,
                 textAlign: TextAlign.center,
-                style: AppText.body(size: 15, color: AppColors.steel)),
+                style: AppText.body(size: 15, color: AppPalette.of(context).secondaryText)),
           ],
         ),
       ),
@@ -345,14 +343,14 @@ class _MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.amberDeep : AppColors.paperRaised,
-          border: Border.all(color: AppColors.line),
+          color: isUser ? AppPalette.of(context).accent : AppPalette.of(context).surface,
+          border: Border.all(color: AppPalette.of(context).border),
         ),
         child: Text(
           message.content,
           style: AppText.body(
             size: 14,
-            color: isUser ? Colors.white : AppColors.ink,
+            color: isUser ? (Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white) : AppPalette.of(context).text,
           ),
         ),
       ),
@@ -371,8 +369,8 @@ class _TypingIndicator extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.paperRaised,
-          border: Border.all(color: AppColors.line),
+          color: AppPalette.of(context).surface,
+          border: Border.all(color: AppPalette.of(context).border),
         ),
         child: SizedBox(
           width: 20,
@@ -383,7 +381,7 @@ class _TypingIndicator extends StatelessWidget {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: AppColors.steel,
+                color: AppPalette.of(context).secondaryText,
               ),
             ),
           ),
@@ -416,8 +414,8 @@ class _InputBar extends StatelessWidget {
         bottom: 12 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
-        color: AppColors.paper,
-        border: Border(top: BorderSide(color: AppColors.line)),
+        color: AppPalette.of(context).background,
+        border: Border(top: BorderSide(color: AppPalette.of(context).border)),
       ),
       child: Row(
         children: [
@@ -427,27 +425,27 @@ class _InputBar extends StatelessWidget {
               enabled: enabled,
               minLines: 1,
               maxLines: 4,
-              style: AppText.body(size: 14),
+              style: AppText.body(size: 14, color: AppPalette.of(context).text),
               decoration: InputDecoration(
                 hintText: sending
                     ? 'Getting your answer...'
                     : 'Describe your business or activities...',
-                hintStyle: AppText.body(size: 14, color: AppColors.steel),
+                hintStyle: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
                 filled: true,
-                fillColor: AppColors.paperRaised,
+                fillColor: AppPalette.of(context).surface,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: AppColors.line),
+                  borderSide: BorderSide(color: AppPalette.of(context).border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: AppColors.line),
+                  borderSide: BorderSide(color: AppPalette.of(context).border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: AppColors.amberDeep),
+                  borderSide: BorderSide(color: AppPalette.of(context).accent),
                 ),
               ),
               onSubmitted: (_) => onSend(),
@@ -466,8 +464,8 @@ class _InputBar extends StatelessWidget {
               : IconButton(
                   onPressed: enabled ? onSend : null,
                   icon: const Icon(Icons.send),
-                  color: AppColors.amberDeep,
-                  disabledColor: AppColors.steel.withValues(alpha: 0.4),
+                  color: AppPalette.of(context).accent,
+                  disabledColor: AppPalette.of(context).secondaryText.withValues(alpha: 0.4),
                 ),
         ],
       ),

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../data/legislation_access_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../data/entries_repository.dart';
 import '../data/iso_repository.dart';
@@ -229,13 +231,20 @@ class _IsoScreenState extends State<IsoScreen> {
         return;
       }
 
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DetailScreen(
-            entries: scoped,
-            initialId: entry.id,
-          ),
-        ),
+      await LegislationAccessService.instance.open(
+        context: context,
+        onOpen: () async {
+          if (!mounted || _openClause != originalClause) return;
+
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DetailScreen(
+                entries: scoped,
+                initialId: entry.id,
+              ),
+            ),
+          );
+        },
       );
     } catch (error) {
       debugPrint('Unable to open related regulation: $error');
@@ -257,7 +266,7 @@ class _IsoScreenState extends State<IsoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: AppPalette.of(context).background,
       body: SafeArea(
         child: Column(
           children: [
@@ -290,6 +299,7 @@ class _Header extends StatelessWidget {
   final bool showSpeech;
   final bool isSpeaking;
   final VoidCallback onSpeechTap;
+
   const _Header({
     required this.title,
     required this.onBack,
@@ -302,27 +312,55 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.line))),
-      child: Row(
-        children: [
-          InkWell(onTap: onBack, child: const Icon(Icons.arrow_back, size: 18, color: AppColors.ink)),
-          const SizedBox(width: 14),
-          Expanded(child: Text(title, style: AppText.headline(size: 17, weight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-          if (showSpeech) ...[
-            const SizedBox(width: 10),
-            InkWell(
-              onTap: onSpeechTap,
-              child: Icon(
-                isSpeaking ? Icons.stop_circle_outlined : Icons.volume_up_outlined,
-                size: 20,
-                color: isSpeaking ? AppColors.amberDeep : AppColors.ink,
+    return PremiumHeaderSurface(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: Row(
+          children: [
+            PremiumHeaderButton(
+              icon: Icons.arrow_back_rounded,
+              tooltip: 'Back',
+              onPressed: onBack,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ISO STANDARDS',
+                    style: AppText.label(
+                      size: 10,
+                      color: AppColors.amber,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.headline(size: 16).copyWith(
+                      color: AppColors.paperRaised,
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (showSpeech) ...[
+              const SizedBox(width: 8),
+              PremiumHeaderButton(
+                icon: isSpeaking
+                    ? Icons.stop_circle_outlined
+                    : Icons.volume_up_rounded,
+                tooltip: isSpeaking
+                    ? 'Stop reading'
+                    : 'Read aloud',
+                onPressed: onSpeechTap,
+                active: isSpeaking,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -339,7 +377,7 @@ class _StandardsList extends StatelessWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text('No ISO content loaded yet.', style: AppText.label(size: 13)),
+          child: Text('No ISO content loaded yet.', style: AppText.label(size: 13, color: AppPalette.of(context).secondaryText)),
         ),
       );
     }
@@ -355,8 +393,8 @@ class _StandardsList extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 6),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.paperRaised,
-              border: Border.all(color: AppColors.line),
+              color: AppPalette.of(context).surface,
+              border: Border.all(color: AppPalette.of(context).border),
               borderRadius: BorderRadius.circular(2),
             ),
             child: Row(
@@ -365,13 +403,13 @@ class _StandardsList extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: AppText.headline(size: 16, weight: FontWeight.w600)),
+                      Text(name, style: AppText.headline(size: 16, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
                       const SizedBox(height: 3),
-                      Text('$count clauses', style: AppText.label(size: 11)),
+                      Text('$count clauses', style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward, size: 18, color: AppColors.steel),
+                Icon(Icons.arrow_forward, size: 18, color: AppPalette.of(context).secondaryText),
               ],
             ),
           ),
@@ -392,7 +430,7 @@ class _ClauseList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 24),
       itemCount: clauses.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
+      separatorBuilder: (_, __) => Divider(height: 1, color: AppPalette.of(context).border),
       itemBuilder: (context, i) {
         final c = clauses[i];
         return InkWell(
@@ -406,11 +444,11 @@ class _ClauseList extends StatelessWidget {
                   width: 48,
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(border: Border.all(color: AppColors.ink, width: 1)),
-                  child: Text(c.number, style: AppText.label(size: 11, color: AppColors.ink)),
+                  decoration: BoxDecoration(border: Border.all(color: AppPalette.of(context).text, width: 1)),
+                  child: Text(c.number, style: AppText.label(size: 11, color: AppPalette.of(context).text)),
                 ),
                 const SizedBox(width: 14),
-                Expanded(child: Text(c.title, style: AppText.headline(size: 15, weight: FontWeight.w600))),
+                Expanded(child: Text(c.title, style: AppText.headline(size: 15, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text))),
               ],
             ),
           ),
@@ -430,25 +468,25 @@ class _ClauseDetail extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 20, 22, 24),
       children: [
-        Text(clause.title, style: AppText.headline(size: 20)),
+        Text(clause.title, style: AppText.headline(size: 20).copyWith(color: AppPalette.of(context).text)),
         const SizedBox(height: 14),
-        Text(clause.explanation, style: AppText.body()),
+        Text(clause.explanation, style: AppText.body(color: AppPalette.of(context).text)),
         const SizedBox(height: 18),
-        Text('IN PRACTICE, THIS USUALLY MEANS', style: AppText.label(size: 11, color: AppColors.amberDeep)),
+        Text('IN PRACTICE, THIS USUALLY MEANS', style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
         const SizedBox(height: 8),
         ...clause.practicalPoints.map((p) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('•  ', style: AppText.body()),
-                  Expanded(child: Text(p, style: AppText.body())),
+                  Text('•  ', style: AppText.body(color: AppPalette.of(context).text)),
+                  Expanded(child: Text(p, style: AppText.body(color: AppPalette.of(context).text))),
                 ],
               ),
             )),
         if (clause.relatedRegIds.isNotEmpty) ...[
           const SizedBox(height: 18),
-          Text('RELATED SA LAW', style: AppText.label(size: 11, color: AppColors.amberDeep)),
+          Text('RELATED SA LAW', style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -461,12 +499,12 @@ class _ClauseDetail extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.paperRaised,
-                    border: Border.all(color: AppColors.ink, width: 1.2),
+                    color: AppPalette.of(context).surface,
+                    border: Border.all(color: AppPalette.of(context).text, width: 1.2),
                   ),
                   child: Text(
                     '${entry.collectionShort} ${entry.num}',
-                    style: AppText.label(size: 11, color: AppColors.ink),
+                    style: AppText.label(size: 11, color: AppPalette.of(context).text),
                   ),
                 ),
               );

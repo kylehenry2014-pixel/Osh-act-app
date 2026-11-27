@@ -149,12 +149,10 @@ class _SignageScreenState extends State<SignageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('Signage', style: AppText.headline(size: 18)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'Signage',
+        titleSize: 18,
       ),
       body: _buildBody(),
     );
@@ -162,8 +160,8 @@ class _SignageScreenState extends State<SignageScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColors.amberDeep));
+      return Center(
+          child: CircularProgressIndicator(color: AppPalette.of(context).accent));
     }
     if (_error != null) {
       return Center(
@@ -173,12 +171,12 @@ class _SignageScreenState extends State<SignageScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(_error!,
-                  style: AppText.body(), textAlign: TextAlign.center),
+                  style: AppText.body(color: AppPalette.of(context).text), textAlign: TextAlign.center),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: _load,
                 child: Text('Try again',
-                    style: AppText.label(size: 12, color: AppColors.amberDeep)),
+                    style: AppText.label(size: 12, color: AppPalette.of(context).accent)),
               ),
             ],
           ),
@@ -192,7 +190,7 @@ class _SignageScreenState extends State<SignageScreen> {
           padding: const EdgeInsets.fromLTRB(22, 4, 22, 8),
           child: Text(
             '${_repo.all.length} safety signs - tap a sign to open it',
-            style: AppText.label(size: 12),
+            style: AppText.label(size: 12, color: AppPalette.of(context).secondaryText),
           ),
         ),
       ),
@@ -207,7 +205,7 @@ class _SignageScreenState extends State<SignageScreen> {
             padding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
             child: Text(
               group.toUpperCase(),
-              style: AppText.label(size: 11, color: AppColors.amberDeep),
+              style: AppText.label(size: 11, color: AppPalette.of(context).accent),
             ),
           ),
         ),
@@ -250,8 +248,8 @@ class _SignCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.paperRaised,
-          border: Border.all(color: AppColors.line),
+          color: AppPalette.of(context).surface,
+          border: Border.all(color: AppPalette.of(context).border),
           borderRadius: BorderRadius.circular(2),
         ),
         child: Column(
@@ -264,9 +262,9 @@ class _SignCard extends StatelessWidget {
                   sign.file,
                   fit: BoxFit.contain,
                   cacheWidth: 360,
-                  errorBuilder: (context, error, stack) => const Icon(
+                  errorBuilder: (context, error, stack) => Icon(
                     Icons.image_not_supported_outlined,
-                    color: AppColors.steel,
+                    color: AppPalette.of(context).secondaryText,
                   ),
                 ),
               ),
@@ -278,7 +276,7 @@ class _SignCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: AppText.headline(size: 13, weight: FontWeight.w600),
+                style: AppText.headline(size: 13, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text),
               ),
             ),
           ],
@@ -437,12 +435,10 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
   Widget build(BuildContext context) {
     final sign = widget.sign;
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('Signage', style: AppText.headline(size: 18)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'Signage',
+        titleSize: 18,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -453,18 +449,18 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
               height: 300,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.paperRaised,
-                border: Border.all(color: AppColors.line),
+                color: AppPalette.of(context).surface,
+                border: Border.all(color: AppPalette.of(context).border),
                 borderRadius: BorderRadius.circular(2),
               ),
               child: Center(
                 child: Image.asset(
                   sign.file,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stack) => const Icon(
+                  errorBuilder: (context, error, stack) => Icon(
                     Icons.image_not_supported_outlined,
                     size: 48,
-                    color: AppColors.steel,
+                    color: AppPalette.of(context).secondaryText,
                   ),
                 ),
               ),
@@ -472,42 +468,42 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
             const SizedBox(height: 16),
             Text(
               sign.group.toUpperCase(),
-              style: AppText.label(size: 11, color: AppColors.amberDeep),
+              style: AppText.label(size: 11, color: AppPalette.of(context).accent),
             ),
             const SizedBox(height: 6),
-            Text(sign.label, style: AppText.headline(size: 20)),
+            Text(sign.label, style: AppText.headline(size: 20).copyWith(color: AppPalette.of(context).text)),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _downloading ? null : _download,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.ink,
-                  foregroundColor: AppColors.paperRaised,
+                  backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppPalette.of(context).accent : AppColors.ink,
+                  foregroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : AppColors.paperRaised,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(2),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: _downloading
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 18,
                         width: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.paperRaised,
+                          color: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : AppColors.paperRaised,
                         ),
                       )
                     : Text('Download',
                         style: AppText.label(
-                            size: 12, color: AppColors.paperRaised)),
+                            size: 12, color: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : AppColors.paperRaised)),
               ),
             ),
             const SizedBox(height: 8),
             Center(
               child: Text(
                 'Free: 2 signage downloads a day. Pro: 5 a day.',
-                style: AppText.label(size: 11),
+                style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText),
               ),
             ),
             const SizedBox(height: 20),
@@ -516,7 +512,7 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
               'applicable SANS standards (for example SANS 1186) and your '
               'site risk assessment. Check the requirements before you '
               'display a sign.',
-              style: AppText.label(size: 10.5),
+              style: AppText.label(size: 10.5, color: AppPalette.of(context).secondaryText),
             ),
           ],
         ),

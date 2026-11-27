@@ -75,7 +75,7 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: AppColors.paper,
+      backgroundColor: AppPalette.of(context).background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
       ),
@@ -95,12 +95,10 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
         : <ToolboxTalkEntry>[];
 
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text('Toolbox Talks', style: AppText.headline(size: 20)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: 'Toolbox Talks',
+        titleSize: 20,
       ),
       body: Column(
         children: [
@@ -119,7 +117,7 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
                 'Toolbox Talks are currently unavailable.',
                 style: AppText.body(
                   size: 13,
-                  color: AppColors.steel,
+                  color: AppPalette.of(context).secondaryText,
                 ),
               ),
             ),
@@ -128,25 +126,25 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (v) => setState(() => _query = v),
-              style: AppText.body(size: 14),
+              style: AppText.body(size: 14, color: AppPalette.of(context).text),
               decoration: InputDecoration(
                 hintText: 'Search all 1000 talks...',
-                hintStyle: AppText.body(size: 14, color: AppColors.steel),
+                hintStyle: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
                 prefixIcon: const Icon(Icons.search, size: 20),
                 filled: true,
-                fillColor: AppColors.paperRaised,
+                fillColor: AppPalette.of(context).surface,
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: AppColors.line),
+                  borderSide: BorderSide(color: AppPalette.of(context).border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: AppColors.line),
+                  borderSide: BorderSide(color: AppPalette.of(context).border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: AppColors.amberDeep),
+                  borderSide: BorderSide(color: AppPalette.of(context).accent),
                 ),
               ),
             ),
@@ -158,7 +156,7 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '${searchResults.length} result${searchResults.length == 1 ? '' : 's'}',
-                  style: AppText.label(size: 11),
+                  style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText),
                 ),
               ),
             ),
@@ -169,7 +167,7 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
                     ? Center(
                         child: Text(
                           'No talks match your search.',
-                          style: AppText.body(size: 14, color: AppColors.steel),
+                          style: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
                         ),
                       )
                     : ListView.separated(
@@ -201,8 +199,8 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppColors.paperRaised,
-                            border: Border.all(color: AppColors.line),
+                            color: AppPalette.of(context).surface,
+                            border: Border.all(color: AppPalette.of(context).border),
                           ),
                           child: Row(
                             children: [
@@ -213,15 +211,15 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
                                     Text(
                                       category,
                                       style: AppText.headline(
-                                          size: 15, weight: FontWeight.w600),
+                                          size: 15, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text),
                                     ),
                                     const SizedBox(height: 3),
                                     Text('$count talks',
-                                        style: AppText.label(size: 11)),
+                                        style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText)),
                                   ],
                                 ),
                               ),
-                              Icon(Icons.chevron_right, color: AppColors.steel),
+                              Icon(Icons.chevron_right, color: AppPalette.of(context).secondaryText),
                             ],
                           ),
                         ),
@@ -463,7 +461,7 @@ class _CategoryTalksScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: AppColors.paper,
+      backgroundColor: AppPalette.of(context).background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
       ),
@@ -475,12 +473,10 @@ class _CategoryTalksScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final talks = ToolboxTalksRepository.instance.search(category: category);
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      appBar: AppBar(
-        backgroundColor: AppColors.paper,
-        elevation: 0,
-        title: Text(category, style: AppText.headline(size: 18)),
-        iconTheme: const IconThemeData(color: AppColors.ink),
+      backgroundColor: AppPalette.of(context).background,
+      appBar: PremiumSectionAppBar(
+        title: category,
+        titleSize: 18,
       ),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
@@ -508,8 +504,8 @@ class _TalkListTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.paperRaised,
-          border: Border.all(color: AppColors.line),
+          color: AppPalette.of(context).surface,
+          border: Border.all(color: AppPalette.of(context).border),
         ),
         child: Row(
           children: [
@@ -519,14 +515,14 @@ class _TalkListTile extends StatelessWidget {
                 children: [
                   Text(
                     entry.title,
-                    style: AppText.headline(size: 14, weight: FontWeight.w600),
+                    style: AppText.headline(size: 14, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text),
                   ),
                   const SizedBox(height: 3),
-                  Text(entry.category, style: AppText.label(size: 10.5)),
+                  Text(entry.category, style: AppText.label(size: 10.5, color: AppPalette.of(context).secondaryText)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: AppColors.steel),
+            Icon(Icons.chevron_right, color: AppPalette.of(context).secondaryText),
           ],
         ),
       ),
@@ -823,12 +819,12 @@ class _TalkDetailSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(entry.category,
-              style: AppText.label(size: 11, color: AppColors.amberDeep)),
+              style: AppText.label(size: 11, color: AppPalette.of(context).accent)),
           const SizedBox(height: 4),
-          Text(entry.title, style: AppText.headline(size: 19)),
+          Text(entry.title, style: AppText.headline(size: 19).copyWith(color: AppPalette.of(context).text)),
           const SizedBox(height: 12),
           Text(entry.description,
-              style: AppText.body(size: 14, color: AppColors.steel)),
+              style: AppText.body(size: 14, color: AppPalette.of(context).secondaryText)),
           const SizedBox(height: 20),
           Row(
             children: [

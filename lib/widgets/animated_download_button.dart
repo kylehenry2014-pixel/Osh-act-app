@@ -51,18 +51,18 @@ class _AnimatedDownloadButtonState extends State<AnimatedDownloadButton> {
     switch (state) {
       case _DownloadState.idle:
         return Icon(widget.idleIcon,
-            key: const ValueKey('idle'), size: 20, color: AppColors.amberDeep);
+            key: const ValueKey('idle'), size: 20, color: AppPalette.of(context).accent);
       case _DownloadState.loading:
         return SizedBox(
           key: const ValueKey('loading'),
           width: 18,
           height: 18,
           child: CircularProgressIndicator(
-              strokeWidth: 2.2, color: AppColors.amberDeep),
+              strokeWidth: 2.2, color: AppPalette.of(context).accent),
         );
       case _DownloadState.success:
-        return const Icon(Icons.check_circle,
-            key: ValueKey('success'), size: 20, color: AppColors.green);
+        return Icon(Icons.check_circle,
+            key: const ValueKey('success'), size: 20, color: AppPalette.of(context).success);
     }
   }
 
@@ -80,7 +80,7 @@ class _AnimatedDownloadButtonState extends State<AnimatedDownloadButton> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.line),
+          border: Border.all(color: AppPalette.of(context).border),
           borderRadius: BorderRadius.circular(2),
         ),
         child: Row(
@@ -95,7 +95,7 @@ class _AnimatedDownloadButtonState extends State<AnimatedDownloadButton> {
               child: _iconFor(_state),
             ),
             const SizedBox(width: 8),
-            Text(label, style: AppText.label(size: 12, color: AppColors.ink)),
+            Text(label, style: AppText.label(size: 12, color: AppPalette.of(context).text)),
           ],
         ),
       ),

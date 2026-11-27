@@ -66,6 +66,8 @@ class SubscriptionRepository {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _entitlementSub;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
 
+  final Set<String> _processingPurchases = <String>{};
+
   Future<void> _ensureSignedIn() async {
     if (_auth.currentUser == null) {
       await _auth.signInAnonymously();
@@ -235,16 +237,56 @@ class SubscriptionRepository {
 
   Future<void> _onPurchaseUpdate(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
-      if (purchase.status == PurchaseStatus.purchased ||
-          purchase.status == PurchaseStatus.restored) {
-        final verified = await _verifyAndGrant(purchase);
-        // Acknowledge only after the server confirms the purchase with Google.
-        if (verified && purchase.pendingCompletePurchase) {
+      if (!productIds.contains(purchase.productID)) {
+        continue;
+      }
+
+      if (purchase.status == PurchaseStatus.pending) {
+        continue;
+      }
+
+      final token =
+          purchase.verificationData.serverVerificationData;
+
+      final identity = token.isNotEmpty
+          ? '${purchase.productID}:$token'
+          : '${purchase.productID}:${purchase.purchaseID ?? ''}';
+
+      final processingKey = '$identity:${purchase.status.name}';
+
+      if (!_processingPurchases.add(processingKey)) {
+        continue;
+      }
+
+      try {
+        if (purchase.status == PurchaseStatus.purchased ||
+            purchase.status == PurchaseStatus.restored) {
+          if (token.isEmpty) {
+            debugPrint(
+              '[OHS Billing] Purchase verification data unavailable.',
+            );
+            continue;
+          }
+
+          final verified = await _verifyAndGrant(purchase);
+
+          // Never acknowledge an unverified successful purchase.
+          if (verified && purchase.pendingCompletePurchase) {
+            await _iap.completePurchase(purchase);
+          }
+        } else if (
+            (purchase.status == PurchaseStatus.error ||
+                purchase.status == PurchaseStatus.canceled) &&
+            purchase.pendingCompletePurchase) {
           await _iap.completePurchase(purchase);
         }
-      } else if ((purchase.status == PurchaseStatus.error || purchase.status == PurchaseStatus.canceled) && purchase.pendingCompletePurchase) {
-        // Error or canceled purchases must still be completed.
-        await _iap.completePurchase(purchase);
+      } catch (error) {
+        debugPrint(
+          '[OHS Billing] Purchase processing failed: '
+          '${error.runtimeType}',
+        );
+      } finally {
+        _processingPurchases.remove(processingKey);
       }
     }
   }

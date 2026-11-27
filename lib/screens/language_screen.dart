@@ -52,27 +52,51 @@ class _LanguageScreenState extends State<LanguageScreen> {
     final totalEntries = EntriesRepository.instance.all.length;
 
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: AppPalette.of(context).background,
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.line))),
-              child: Row(
-                children: [
-                  InkWell(onTap: () => Navigator.of(context).pop(), child: const Icon(Icons.arrow_back, size: 18, color: AppColors.ink)),
-                  const SizedBox(width: 14),
-                  Text('Language', style: AppText.headline(size: 17, weight: FontWeight.w600)),
-                ],
+            PremiumHeaderSurface(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    PremiumHeaderButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'OHS ACT & REGULATIONS',
+                            style: AppText.label(
+                              size: 10,
+                              color: AppColors.amber,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Language',
+                            style: AppText.headline(size: 18).copyWith(
+                              color: AppColors.paperRaised,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 16, 22, 4),
               child: Text(
                 'The English text is taken from the official Act and Regulations. Other languages are unofficial translations provided for convenience. For legal purposes, consult the official Government Gazette.',
-                style: AppText.label(size: 11),
+                style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText),
               ),
             ),
             Expanded(
@@ -92,8 +116,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.paperRaised,
-                          border: Border.all(color: selected ? AppColors.amberDeep : AppColors.line, width: selected ? 1.5 : 1),
+                          color: AppPalette.of(context).surface,
+                          border: Border.all(color: selected ? AppPalette.of(context).accent : AppPalette.of(context).border, width: selected ? 1.5 : 1),
                           borderRadius: BorderRadius.circular(2),
                         ),
                         child: Row(
@@ -102,18 +126,18 @@ class _LanguageScreenState extends State<LanguageScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(lang.label, style: AppText.headline(size: 16, weight: FontWeight.w600)),
+                                  Text(lang.label, style: AppText.headline(size: 16, weight: FontWeight.w600).copyWith(color: AppPalette.of(context).text)),
                                   const SizedBox(height: 3),
                                   Text(
                                     lang.available
                                         ? (lang.code == 'en' ? 'Official text' : '$translatedCount of $totalEntries translated')
                                         : 'Coming soon - pending native-speaker review',
-                                    style: AppText.label(size: 11),
+                                    style: AppText.label(size: 11, color: AppPalette.of(context).secondaryText),
                                   ),
                                 ],
                               ),
                             ),
-                            if (selected) const Icon(Icons.check_circle, size: 20, color: AppColors.amberDeep),
+                            if (selected) Icon(Icons.check_circle, size: 20, color: AppPalette.of(context).accent),
                           ],
                         ),
                       ),
