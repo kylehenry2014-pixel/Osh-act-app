@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../data/legislation_access_service.dart';
 import '../data/entries_repository.dart';
 import '../models/entry.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
+import '../theme/appearance_controller.dart';
+import 'notifications_screen.dart';
 import 'detail_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -24,6 +27,15 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   String? _browseCategory;
   String? _browseCollection;
+
+  /// Rating prompts are permitted only on the top-level Home screen.
+  bool get canShowRatingPrompt =>
+      mounted &&
+      !_openingEntry &&
+      _browseCategory == null &&
+      _browseCollection == null &&
+      _searchController.text.trim().isEmpty &&
+      !_searchFocus.hasFocus;
 
   @override
   void dispose() {
@@ -285,15 +297,81 @@ class _Masthead extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'REPUBLIC OF SOUTH AFRICA',
-              style: AppText.label(
-                size: 10,
-                color: AppColors.amber,
-              ).copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'REPUBLIC OF SOUTH AFRICA',
+                    style: AppText.label(
+                      size: 10,
+                      color: AppColors.amber,
+                    ).copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (kEnableAdaptiveAppearance) ...[
+                  ListenableBuilder(
+                    listenable: AppearanceController.instance,
+                    builder: (context, child) {
+                      final appearance =
+                          AppearanceController.instance;
+                      final isDark =
+                          appearance.mode == ThemeMode.dark;
+
+                      return PremiumHeaderButton(
+                        icon: isDark
+                            ? AppIcons.darkModeOutlined
+                            : AppIcons.lightModeOutlined,
+                        tooltip: isDark
+                            ? 'Switch to Light mode'
+                            : 'Switch to Dark mode',
+                        onPressed: () async {
+                          if (!appearance.isLoaded ||
+                              appearance.isSaving) {
+                            return;
+                          }
+
+                          final saved = await appearance.setMode(
+                            isDark
+                                ? ThemeMode.light
+                                : ThemeMode.dark,
+                          );
+
+                          if (!context.mounted) return;
+
+                          if (!saved) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Could not save appearance. '
+                                  'Please try again.',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                PremiumHeaderButton(
+                  icon: AppIcons.notificationsActiveOutlined,
+                  tooltip: 'Notifications',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             Text.rich(
@@ -365,7 +443,7 @@ class _SearchField extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            Icon(Icons.search, size: 18, color: AppPalette.of(context).secondaryText),
+            Icon(AppIcons.search, size: 18, color: AppPalette.of(context).secondaryText),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -601,7 +679,7 @@ class _BrowseCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward, size: 18, color: AppPalette.of(context).secondaryText),
+            Icon(AppIcons.arrowForward, size: 18, color: AppPalette.of(context).secondaryText),
                 ],
               ),
             ),

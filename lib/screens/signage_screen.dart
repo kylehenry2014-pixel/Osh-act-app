@@ -7,10 +7,12 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import '../data/ad_service.dart';
+import '../data/document_integrity.dart';
 import '../data/download_allowance_service.dart';
 import '../data/saved_documents_repository.dart';
 import '../data/signage_repository.dart';
 import '../data/subscription_repository.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 class SignageScreen extends StatefulWidget {
@@ -150,7 +152,7 @@ class _SignageScreenState extends State<SignageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
+      appBar: const PremiumSectionAppBar(
         title: 'Signage',
         titleSize: 18,
       ),
@@ -263,7 +265,7 @@ class _SignCard extends StatelessWidget {
                   fit: BoxFit.contain,
                   cacheWidth: 360,
                   errorBuilder: (context, error, stack) => Icon(
-                    Icons.image_not_supported_outlined,
+                    AppIcons.imageNotSupportedOutlined,
                     color: AppPalette.of(context).secondaryText,
                   ),
                 ),
@@ -367,6 +369,11 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
         throw StateError('The prepared sign is incomplete.');
       }
 
+      await DocumentIntegrity.validateFile(
+        tmp,
+        expectedExtension: 'png',
+      );
+
       // Check local document storage before consuming allowance.
       await SavedDocumentsRepository.instance.load();
 
@@ -393,6 +400,8 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
       }
 
       String? savedPath;
+      bool externalExportFailed = false;
+
       try {
         savedPath = await FlutterFileDialog.saveFile(
           params: SaveFileDialogParams(
@@ -402,6 +411,7 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
         );
       } catch (error) {
         debugPrint('External sign export failed: $error');
+        externalExportFailed = true;
         savedPath = null;
       }
 
@@ -409,10 +419,20 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
       final leftText = allowance.limit > 0 && left >= 0
           ? ' $left of ${allowance.limit} signage downloads left today.'
           : '';
-      _snack((savedPath != null && savedPath.isNotEmpty
-              ? 'Saved to your phone and My Documents.'
-              : 'Saved to My Documents. No additional phone copy was saved.') +
-          leftText);
+      final String outcomeMessage;
+
+      if (externalExportFailed) {
+        outcomeMessage =
+            'Saved to My Documents, but the phone export failed.';
+      } else if (savedPath != null && savedPath.isNotEmpty) {
+        outcomeMessage =
+            'Saved to your phone and My Documents.';
+      } else {
+        outcomeMessage =
+            'Saved to My Documents. Phone export cancelled.';
+      }
+
+      _snack(outcomeMessage + leftText);
     } on DownloadLimitException catch (e) {
       _snack(e.message);
     } catch (error) {
@@ -436,7 +456,7 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
     final sign = widget.sign;
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
+      appBar: const PremiumSectionAppBar(
         title: 'Signage',
         titleSize: 18,
       ),
@@ -458,7 +478,7 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
                   sign.file,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stack) => Icon(
-                    Icons.image_not_supported_outlined,
+                    AppIcons.imageNotSupportedOutlined,
                     size: 48,
                     color: AppPalette.of(context).secondaryText,
                   ),

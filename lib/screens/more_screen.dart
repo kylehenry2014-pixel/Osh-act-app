@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
-import '../theme/appearance_controller.dart';
-import '../widgets/appearance_selector.dart';
+import 'settings_screen.dart';
 import '../data/ad_service.dart';
 import '../data/connectivity_service.dart';
 import '../data/iso_repository.dart';
@@ -57,7 +57,7 @@ class _MoreScreenState extends State<MoreScreen> {
         'Feature opening failed: ${error.runtimeType}',
       );
 
-      if (_canContinueFeatureOpen()) {
+      if (mounted && _canContinueFeatureOpen()) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           const SnackBar(
             content: Text(
@@ -149,7 +149,7 @@ class _MoreScreenState extends State<MoreScreen> {
 
   Future<void> _openChatInternal() async {
     if (!await _checkOnlineOrWarn('use the Safety Chat Bot')) return;
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
     if (SubscriptionRepository.instance.isPro) {
       await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => const ChatScreen(),
@@ -158,12 +158,12 @@ class _MoreScreenState extends State<MoreScreen> {
     }
     final adCount =
         await AdService.instance.nextRequiredAdCount(_chatFeatureKey);
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
     final confirmed = await _confirmWatchAds(adCount, 'ask a question');
-    if (confirmed != true || !_canContinueFeatureOpen()) return;
+    if (!mounted || confirmed != true || !_canContinueFeatureOpen()) return;
 
     final earned = await AdService.instance.watchAds(adCount);
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
 
     if (!earned) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -178,7 +178,7 @@ class _MoreScreenState extends State<MoreScreen> {
       return;
     }
     await AdService.instance.recordUnlockedRequest(_chatFeatureKey);
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
 
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => const ChatScreen(),
@@ -193,7 +193,7 @@ class _MoreScreenState extends State<MoreScreen> {
 
   Future<void> _openCertificatesInternal() async {
     if (!await _checkOnlineOrWarn('view your certificate reminders')) return;
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
     if (SubscriptionRepository.instance.isPro) {
       await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => const CertificatesScreen(),
@@ -203,13 +203,13 @@ class _MoreScreenState extends State<MoreScreen> {
     }
     final adCount =
         await AdService.instance.nextRequiredAdCount(_certificatesFeatureKey);
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
     final confirmed =
         await _confirmWatchAds(adCount, 'view your certificate reminders');
-    if (confirmed != true || !_canContinueFeatureOpen()) return;
+    if (!mounted || confirmed != true || !_canContinueFeatureOpen()) return;
 
     final earned = await AdService.instance.watchAds(adCount);
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
 
     if (!earned) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -224,7 +224,7 @@ class _MoreScreenState extends State<MoreScreen> {
       return;
     }
     await AdService.instance.recordUnlockedRequest(_certificatesFeatureKey);
-    if (!_canContinueFeatureOpen()) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
 
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => const CertificatesScreen(),
@@ -302,38 +302,40 @@ class _MoreScreenState extends State<MoreScreen> {
 
   IconData _featureIcon(String title) {
     switch (title) {
+      case 'Settings':
+        return AppIcons.settingsOutlined;
       case 'Bookmarks':
-        return Icons.bookmark_rounded;
+        return AppIcons.bookmarkRounded;
       case 'Safety Chat Bot':
-        return Icons.chat_bubble_outline;
+        return AppIcons.chatBubbleOutline;
       case 'Toolbox Talks':
-        return Icons.groups_outlined;
+        return AppIcons.groupsOutlined;
       case 'SDS Finder':
-        return Icons.science_outlined;
+        return AppIcons.scienceOutlined;
       case 'Certificate Reminders':
-        return Icons.workspace_premium_outlined;
+        return AppIcons.workspacePremiumOutlined;
       case 'Signage':
-        return Icons.warning_amber_rounded;
+        return AppIcons.warningAmberRounded;
       case 'Daily Citation':
-        return Icons.menu_book_outlined;
+        return AppIcons.menuBookOutlined;
       case 'Checklists':
-        return Icons.checklist;
+        return AppIcons.checklist;
       case 'ISO Standards':
-        return Icons.verified_user_outlined;
+        return AppIcons.verifiedUserOutlined;
       case 'Legal Appointments':
-        return Icons.assignment_ind_outlined;
+        return AppIcons.assignmentIndOutlined;
       case 'Investigations':
-        return Icons.manage_search;
+        return AppIcons.manageSearch;
       case 'Procedures':
-        return Icons.description_outlined;
+        return AppIcons.descriptionOutlined;
       case 'Safety Videos':
-        return Icons.play_circle_outline;
+        return AppIcons.playCircleOutline;
       case 'Safety Consultant Finder':
-        return Icons.person_search_outlined;
+        return AppIcons.personSearchOutlined;
       case 'Safety Quiz Game':
-        return Icons.quiz_outlined;
+        return AppIcons.quizOutlined;
       default:
-        return Icons.folder_outlined;
+        return AppIcons.folderOutlined;
     }
   }
 
@@ -414,7 +416,7 @@ class _MoreScreenState extends State<MoreScreen> {
             ),
             const SizedBox(width: 6),
             Icon(
-              Icons.chevron_right_rounded,
+              AppIcons.chevronRightRounded,
               color: Theme.of(context).brightness == Brightness.dark ? _MoreStyle.lightGold : _MoreStyle.bronze,
               size: 24,
             ),
@@ -486,7 +488,7 @@ class _MoreScreenState extends State<MoreScreen> {
                       shaderCallback: (bounds) =>
                           _MoreStyle.goldGradient.createShader(bounds),
                       child: const Icon(
-                        Icons.workspace_premium,
+                        AppIcons.workspacePremium,
                         size: 44,
                         color: Colors.white,
                       ),
@@ -552,7 +554,7 @@ class _MoreScreenState extends State<MoreScreen> {
                         ),
                       ),
                       const Icon(
-                        Icons.chevron_right_rounded,
+                        AppIcons.chevronRightRounded,
                         color: _MoreStyle.ink,
                       ),
                     ],
@@ -584,10 +586,28 @@ class _MoreScreenState extends State<MoreScreen> {
                     return _subscriptionBanner(isPro);
                   },
                 ),
-                if (kEnableAdaptiveAppearance) ...[
-                  const SizedBox(height: 18),
-                  const AppearanceSelector(),
-                ],
+                const SizedBox(height: 18),
+                _card(
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (settingsContext) =>
+                            SettingsScreen(
+                          onOpenSubscription: () {
+                            Navigator.of(settingsContext).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    const SubscriptionScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  title: 'Settings',
+                  subtitle: 'Notifications and application preferences',
+                ),
                 const SizedBox(height: 26),
                 _sectionTitle(
                   'Safety Tools',
@@ -784,7 +804,7 @@ class _BugReportSection extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  Icons.bug_report_outlined,
+                  AppIcons.bugReportOutlined,
                   color: Theme.of(context).brightness == Brightness.dark ? _MoreStyle.lightGold : _MoreStyle.bronze,
                 ),
                 const SizedBox(width: 10),
@@ -796,8 +816,8 @@ class _BugReportSection extends StatelessWidget {
                 ),
                 Icon(
                   open
-                      ? Icons.expand_less
-                      : Icons.expand_more,
+                      ? AppIcons.expandLess
+                      : AppIcons.expandMore,
                   color: Theme.of(context).brightness == Brightness.dark ? _MoreStyle.lightGold : _MoreStyle.bronze,
                 ),
               ],
@@ -894,7 +914,6 @@ class _MoreStyle {
   static const gold = Color(0xFFDA9B2A);
   static const lightGold = Color(0xFFFFE4A0);
   static const bronze = Color(0xFF95621C);
-  static const cream = Color(0xFFF7F3E6);
 
   static const darkGradient = LinearGradient(
     begin: Alignment.topLeft,

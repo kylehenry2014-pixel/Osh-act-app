@@ -40,6 +40,7 @@ class LegislationAccessService {
         final adCount = await AdService.instance
             .nextRequiredAdCount(_featureKey);
 
+        if (!context.mounted) return;
         if (!_canContinue(context)) return;
 
         if (!SubscriptionRepository.instance.isPro) {
@@ -75,6 +76,7 @@ class LegislationAccessService {
             ),
           );
 
+          if (!context.mounted) return;
           if (!_canContinue(context) || confirmed != true) {
             return;
           }
@@ -83,6 +85,7 @@ class LegislationAccessService {
             final earned =
                 await AdService.instance.watchAds(adCount);
 
+            if (!context.mounted) return;
             if (!_canContinue(context)) return;
 
             if (!earned) {
@@ -101,6 +104,7 @@ class LegislationAccessService {
         }
       }
 
+      if (!context.mounted) return;
       if (!_canContinue(context)) return;
 
       await onOpen();
@@ -108,6 +112,8 @@ class LegislationAccessService {
       debugPrint(
         'Legislation access failed: ${error.runtimeType}',
       );
+
+      if (!context.mounted) return;
 
       _showMessage(
         context,

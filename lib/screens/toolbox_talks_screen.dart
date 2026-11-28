@@ -5,10 +5,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import '../data/ad_service.dart';
+import '../data/document_integrity.dart';
 import '../data/download_allowance_service.dart';
 import '../data/subscription_repository.dart';
 import '../data/toolbox_talks_repository.dart';
 import '../models/toolbox_talk_entry.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_download_button.dart';
 
@@ -37,9 +39,15 @@ Future<String> _extractAssetToTemp(String assetPath, String fileName) async {
       flush: true,
     );
 
-    if (await file.length() == 0) {
-      throw StateError('The toolbox talk is empty.');
+    if (data.lengthInBytes == 0 ||
+        await file.length() != data.lengthInBytes) {
+      throw StateError('The toolbox talk is incomplete.');
     }
+
+    await DocumentIntegrity.validateFile(
+      file,
+      expectedExtension: 'docx',
+    );
 
     return file.path;
   } catch (error) {
@@ -54,7 +62,12 @@ Future<String> _extractAssetToTemp(String assetPath, String fileName) async {
 }
 
 class ToolboxTalksScreen extends StatefulWidget {
-  const ToolboxTalksScreen({super.key});
+  final bool embedded;
+
+  const ToolboxTalksScreen({
+    super.key,
+    this.embedded = false,
+  });
 
   @override
   State<ToolboxTalksScreen> createState() => _ToolboxTalksScreenState();
@@ -96,10 +109,15 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
 
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
-        title: 'Toolbox Talks',
-        titleSize: 20,
-      ),
+      appBar: widget.embedded
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              title: const Text('Toolbox Talks'),
+            )
+          : const PremiumSectionAppBar(
+              title: 'Toolbox Talks',
+              titleSize: 20,
+            ),
       body: Column(
         children: [
           if (!searching && talkOfDay != null)
@@ -130,7 +148,7 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
               decoration: InputDecoration(
                 hintText: 'Search all 1000 talks...',
                 hintStyle: AppText.body(size: 14, color: AppPalette.of(context).secondaryText),
-                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIcon: const Icon(AppIcons.search, size: 20),
                 filled: true,
                 fillColor: AppPalette.of(context).surface,
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -219,7 +237,7 @@ class _ToolboxTalksScreenState extends State<ToolboxTalksScreen> {
                                   ],
                                 ),
                               ),
-                              Icon(Icons.chevron_right, color: AppPalette.of(context).secondaryText),
+                              Icon(AppIcons.chevronRight, color: AppPalette.of(context).secondaryText),
                             ],
                           ),
                         ),
@@ -297,7 +315,7 @@ class _PremiumDailyTalkCard extends StatelessWidget {
                       Row(
                         children: [
                           const Icon(
-                            Icons.today_outlined,
+                            AppIcons.todayOutlined,
                             color: AppColors.amber,
                             size: 17,
                           ),
@@ -431,7 +449,7 @@ class _PremiumDailyTalkCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             const Icon(
-                              Icons.arrow_forward_rounded,
+                              AppIcons.arrowForwardRounded,
                               color: AppColors.ink,
                               size: 19,
                             ),
@@ -522,7 +540,7 @@ class _TalkListTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: AppPalette.of(context).secondaryText),
+            Icon(AppIcons.chevronRight, color: AppPalette.of(context).secondaryText),
           ],
         ),
       ),
@@ -746,10 +764,10 @@ class _TalkDetailSheet extends StatelessWidget {
 
       final preparedFile = File(temporaryPath);
 
-      if (!await preparedFile.exists() ||
-          await preparedFile.length() == 0) {
-        throw StateError('The prepared document is unavailable.');
-      }
+      await DocumentIntegrity.validateFile(
+        preparedFile,
+        expectedExtension: 'docx',
+      );
 
       if (!context.mounted ||
           ModalRoute.of(context)?.isCurrent != true) {
@@ -771,27 +789,35 @@ class _TalkDetailSheet extends StatelessWidget {
       );
 
       if (savedPath == null || savedPath.isEmpty) {
-        _showMessage(
-          context,
-          'Save cancelled. Your download allowance was already used.',
-        );
+        if (context.mounted) {
+          _showMessage(
+            context,
+            'Save cancelled. Your download allowance was already used.',
+          );
+        }
         throw const _TalkSaveCancelled();
       }
 
-      _showMessage(context, 'Toolbox talk saved successfully.');
+      if (context.mounted) {
+        _showMessage(context, 'Toolbox talk saved successfully.');
+      }
     } on _TalkSaveCancelled {
       // Reset the animated button without reporting success.
       rethrow;
     } on DownloadLimitException catch (error) {
-      _showMessage(context, error.message);
+      if (context.mounted) {
+        _showMessage(context, error.message);
+      }
       rethrow;
     } catch (error) {
       debugPrint('Toolbox talk save failed: $error');
 
-      _showMessage(
-        context,
-        'Could not save this talk. Please try again.',
-      );
+      if (context.mounted) {
+        _showMessage(
+          context,
+          'Could not save this talk. Please try again.',
+        );
+      }
 
       rethrow;
     } finally {
@@ -831,7 +857,7 @@ class _TalkDetailSheet extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _openTalk(context),
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  icon: const Icon(AppIcons.visibilityOutlined, size: 18),
                   label: const Text('Open'),
                 ),
               ),

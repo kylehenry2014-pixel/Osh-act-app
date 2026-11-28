@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/entries_repository.dart';
 import '../data/translations_repository.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 class LanguageScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                 child: Row(
                   children: [
                     PremiumHeaderButton(
-                      icon: Icons.arrow_back_rounded,
+                      icon: AppIcons.arrowBackRounded,
                       tooltip: 'Back',
                       onPressed: () => Navigator.of(context).pop(),
                     ),
@@ -137,7 +138,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                                 ],
                               ),
                             ),
-                            if (selected) Icon(Icons.check_circle, size: 20, color: AppPalette.of(context).accent),
+                            if (selected) Icon(AppIcons.checkCircle, size: 20, color: AppPalette.of(context).accent),
                           ],
                         ),
                       ),

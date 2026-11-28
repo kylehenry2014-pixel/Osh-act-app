@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import '../data/saved_documents_repository.dart';
 import '../models/saved_document.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 /// Lists every document the user has saved from Checklists or Toolbox
@@ -72,28 +71,16 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     setState(() => _operationBusy = true);
 
     try {
-      final file = File(document.filePath);
-
-      if (!await file.exists()) {
-        _snack(
-          'This document is no longer available on your device.',
-        );
-        return;
-      }
-
-      if (await file.length() == 0) {
-        _snack(
-          'This document is empty or damaged.',
-        );
-        return;
-      }
+      final safePath = await _repo.validateForOpening(
+        document.id,
+      );
 
       if (!mounted ||
           ModalRoute.of(context)?.isCurrent != true) {
         return;
       }
 
-      final result = await OpenFile.open(document.filePath);
+      final result = await OpenFile.open(safePath);
 
       if (!mounted) return;
 
@@ -180,7 +167,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.error_outline,
+              AppIcons.errorOutline,
               size: 40,
               color: AppPalette.of(context).secondaryText,
             ),
@@ -209,7 +196,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
+      appBar: const PremiumSectionAppBar(
         title: 'My Documents',
         titleSize: 18,
       ),
@@ -228,7 +215,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.folder_open_outlined,
+                    Icon(AppIcons.folderOpenOutlined,
                         size: 40, color: AppPalette.of(context).secondaryText),
                     const SizedBox(height: 16),
                     Text(
@@ -256,7 +243,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.description_outlined,
+                        Icon(AppIcons.descriptionOutlined,
                             color: AppPalette.of(context).secondaryText),
                         const SizedBox(width: 12),
                         Expanded(
@@ -273,7 +260,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.delete_outline,
+                          icon: Icon(AppIcons.deleteOutline,
                               color: AppPalette.of(context).secondaryText),
                           onPressed: _operationBusy ? null : () => _confirmDelete(document),
                         ),

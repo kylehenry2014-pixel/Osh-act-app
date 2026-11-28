@@ -9,6 +9,8 @@ import 'package:timezone/timezone.dart' as tz;
 import '../models/entry.dart';
 import 'entries_repository.dart';
 import 'notification_service.dart';
+import 'notification_inbox_repository.dart';
+import 'notification_schedule_repository.dart';
 
 /// One choice in the "Acts to include" list of the Daily Citation settings.
 class CitationSource {
@@ -39,6 +41,9 @@ class DailyCitationService {
   static const _otherPrefix = 'act:';
 
   final _plugin = FlutterLocalNotificationsPlugin();
+
+  final _scheduleLedger =
+      NotificationScheduleRepository.instance;
 
   static const _scheduleKey = 'daily_citation_schedule_v2';
 
@@ -200,7 +205,28 @@ class DailyCitationService {
   }
 
   Future<void> _refreshOnce() async {
+    var ledgerHealthy = true;
+
+    Future<void> protectLedger(
+      Future<void> Function() operation,
+    ) async {
+      try {
+        await operation();
+      } catch (error) {
+        ledgerHealthy = false;
+
+        debugPrint(
+          'Daily citation history unavailable: '
+          '${error.runtimeType}',
+        );
+      }
+    }
+
     await NotificationService.instance.init();
+
+    await protectLedger(
+      () => _scheduleLedger.reconcileDue(),
+    );
 
     final prefs = await SharedPreferences.getInstance();
 
@@ -214,6 +240,12 @@ class DailyCitationService {
     if (!await isEnabled()) {
       for (final id in existingIds) {
         await _plugin.cancel(id);
+      }
+
+      for (var i = 0; i < _slots; i++) {
+        await protectLedger(
+          () => _scheduleLedger.removePlatformId(_baseId + i),
+        );
       }
 
       await _checkWrite(prefs, prefs.remove(_scheduleKey));
@@ -255,7 +287,7 @@ class DailyCitationService {
           );
 
     final fingerprint = [
-      'v2',
+      'v3',
       tz.local.name,
       startDay.toIso8601String(),
       pool.length.toString(),
@@ -266,7 +298,8 @@ class DailyCitationService {
       for (var i = 0; i < _daysAhead; i++) _baseId + i,
     };
 
-    if (prefs.get(_scheduleKey) == fingerprint &&
+    if (ledgerHealthy &&
+        prefs.get(_scheduleKey) == fingerprint &&
         existingIds.length == desiredIds.length &&
         existingIds.containsAll(desiredIds)) {
       return;
@@ -293,6 +326,8 @@ class DailyCitationService {
 
       // Reuse the reserved ID instead of cancelling
       // the entire existing schedule before rebuilding it.
+      final notificationId = 'daily_citation_$seed';
+
       await _plugin.zonedSchedule(
         _baseId + d,
         _title(entry),
@@ -303,6 +338,23 @@ class DailyCitationService {
             AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
+        payload: 'citation:${entry.id}',
+      );
+
+      await protectLedger(
+        () => _scheduleLedger.record(
+          ScheduledInboxNotification(
+            platformId: _baseId + d,
+            notification: InboxNotification(
+              id: notificationId,
+              type: InboxNotificationType.dailyCitation,
+              title: _title(entry),
+              message: _snippet(entry, 450),
+              createdAt: when.toUtc(),
+              referenceId: entry.id,
+            ),
+          ),
+        ),
       );
     }
 
@@ -310,10 +362,26 @@ class DailyCitationService {
       await _plugin.cancel(id);
     }
 
-    await _checkWrite(
-      prefs,
-      prefs.setString(_scheduleKey, fingerprint),
-    );
+    for (var i = 0; i < _slots; i++) {
+      final id = _baseId + i;
+
+      if (!desiredIds.contains(id)) {
+        await protectLedger(
+          () => _scheduleLedger.removePlatformId(id),
+        );
+      }
+    }
+
+    if (ledgerHealthy) {
+      await _checkWrite(
+        prefs,
+        prefs.setString(_scheduleKey, fingerprint),
+      );
+    } else {
+      debugPrint(
+        'Citation history requires reconciliation retry.',
+      );
+    }
 
     debugPrint('Daily citation schedule refreshed.');
   }
@@ -336,7 +404,25 @@ class DailyCitationService {
           _title(entry),
           _snippet(entry, 140),
           _details(entry),
+          payload: 'citation:${entry.id}',
         );
+
+        try {
+          final now = DateTime.now().toUtc();
+
+          await NotificationInboxRepository.instance.add(
+            InboxNotification(
+              id: 'citation_test_${now.microsecondsSinceEpoch}',
+              type: InboxNotificationType.dailyCitation,
+              title: 'Test: ${_title(entry)}',
+              message: _snippet(entry, 450),
+              createdAt: now,
+              referenceId: entry.id,
+            ),
+          );
+        } catch (error) {
+          debugPrint('Citation test history unavailable: $error');
+        }
 
         return true;
       } catch (error) {

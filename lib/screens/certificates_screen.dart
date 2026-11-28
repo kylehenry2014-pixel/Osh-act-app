@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../data/certificates_repository.dart';
 import '../models/certificate.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import 'add_certificate_screen.dart';
 
@@ -27,7 +28,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
   Future<void> _openDetail(Certificate cert) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-          builder: (_) => _CertificateDetailScreen(certificate: cert)),
+          builder: (_) => CertificateDetailScreen(certificate: cert)),
     );
     if (mounted) setState(() {});
   }
@@ -38,7 +39,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
 
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
+      appBar: const PremiumSectionAppBar(
         title: 'Certificate Reminders',
         titleSize: 18,
       ),
@@ -47,7 +48,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
         backgroundColor: AppPalette.of(context).accent,
         foregroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.ink : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        child: const Icon(Icons.add),
+        child: const Icon(AppIcons.add),
       ),
       body: certs.isEmpty
           ? _EmptyState(onAdd: _openAdd)
@@ -76,7 +77,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.badge_outlined, size: 40, color: AppPalette.of(context).secondaryText),
+            Icon(AppIcons.badgeOutlined, size: 40, color: AppPalette.of(context).secondaryText),
             const SizedBox(height: 16),
             Text(
               'No certificates saved yet. Add photos of a certificate - even a multi-page one like a full medical pack - and set its expiry date, and this app will remind you before it lapses.',
@@ -86,7 +87,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onAdd,
-              icon: const Icon(Icons.add),
+              icon: const Icon(AppIcons.add),
               label: const Text('Add Certificate'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppPalette.of(context).accent,
@@ -136,7 +137,7 @@ class _CertificateCard extends StatelessWidget {
                       width: 56,
                       height: 56,
                       color: AppPalette.of(context).border,
-                      child: Icon(Icons.description_outlined,
+                      child: Icon(AppIcons.descriptionOutlined,
                           color: AppPalette.of(context).secondaryText),
                     ),
                   ),
@@ -188,7 +189,7 @@ class _CertificateCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: AppPalette.of(context).secondaryText),
+            Icon(AppIcons.chevronRight, color: AppPalette.of(context).secondaryText),
           ],
         ),
       ),
@@ -214,16 +215,16 @@ class _CertificateCard extends StatelessWidget {
   }
 }
 
-class _CertificateDetailScreen extends StatefulWidget {
+class CertificateDetailScreen extends StatefulWidget {
   final Certificate certificate;
-  const _CertificateDetailScreen({required this.certificate});
+  const CertificateDetailScreen({super.key, required this.certificate});
 
   @override
-  State<_CertificateDetailScreen> createState() =>
+  State<CertificateDetailScreen> createState() =>
       _CertificateDetailScreenState();
 }
 
-class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
+class _CertificateDetailScreenState extends State<CertificateDetailScreen> {
   late Certificate _certificate;
   int _pageIndex = 0;
   bool _deleting = false;
@@ -336,9 +337,9 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
         title: cert.name,
         titleSize: 17,
         actions: [
-          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: (_deleting || _editing) ? null : _edit),
+          IconButton(icon: const Icon(AppIcons.editOutlined), onPressed: (_deleting || _editing) ? null : _edit),
           IconButton(
-              icon: const Icon(Icons.delete_outline),
+              icon: const Icon(AppIcons.deleteOutline),
               onPressed: (_deleting || _editing) ? null : _confirmDelete),
         ],
       ),
@@ -392,7 +393,7 @@ class _CertificateDetailScreenState extends State<_CertificateDetailScreen> {
                           width: index == _pageIndex ? 2 : 1,
                         ),
                       ),
-                      child: Image.file(File(pages[index]), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                      child: Image.file(File(pages[index]), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(AppIcons.brokenImageOutlined)),
                     ),
                   ),
                 ),

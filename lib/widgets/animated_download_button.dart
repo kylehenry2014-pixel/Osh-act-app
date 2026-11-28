@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 enum _DownloadState { idle, loading, success }
@@ -21,7 +22,7 @@ class AnimatedDownloadButton extends StatefulWidget {
     super.key,
     required this.onDownload,
     this.idleLabel = 'Save',
-    this.idleIcon = Icons.download_outlined,
+    this.idleIcon = AppIcons.downloadOutlined,
   });
 
   @override
@@ -61,7 +62,7 @@ class _AnimatedDownloadButtonState extends State<AnimatedDownloadButton> {
               strokeWidth: 2.2, color: AppPalette.of(context).accent),
         );
       case _DownloadState.success:
-        return Icon(Icons.check_circle,
+        return Icon(AppIcons.checkCircle,
             key: const ValueKey('success'), size: 20, color: AppPalette.of(context).success);
     }
   }

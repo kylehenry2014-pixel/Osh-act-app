@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import '../data/connectivity_service.dart';
 import '../data/ad_service.dart';
 import '../data/subscription_repository.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../data/chat_message.dart';
 import '../data/chat_repository.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final bool embedded;
+
+  const ChatScreen({
+    super.key,
+    this.embedded = false,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -218,7 +224,12 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
+      appBar: widget.embedded
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              title: const Text('AI Assistant'),
+            )
+          : const PremiumSectionAppBar(
         title: 'Safety Chat Bot',
         titleSize: 20,
       ),
@@ -227,7 +238,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: SelectionArea(
               child: _messages.isEmpty
-                  ? _WelcomeCard(text: _welcomeText)
+                  ? const _WelcomeCard(text: _welcomeText)
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.all(16),
@@ -251,8 +262,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Icon(
                     _errorIsQuota
-                        ? Icons.hourglass_bottom
-                        : Icons.error_outline,
+                        ? AppIcons.hourglassBottom
+                        : AppIcons.errorOutline,
                     size: 16,
                     color: _errorIsQuota ? AppPalette.of(context).accent : AppPalette.of(context).error,
                   ),
@@ -278,7 +289,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _editPendingMessage,
-                      icon: const Icon(Icons.edit_outlined),
+                      icon: const Icon(AppIcons.editOutlined),
                       label: const Text('Edit question'),
                     ),
                   ),
@@ -286,7 +297,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _errorIsQuota ? null : _retry,
-                      icon: const Icon(Icons.refresh_rounded),
+                      icon: const Icon(AppIcons.refreshRounded),
                       label: const Text('Retry'),
                     ),
                   ),
@@ -317,7 +328,7 @@ class _WelcomeCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.forum_outlined, size: 40, color: AppPalette.of(context).secondaryText),
+            Icon(AppIcons.forumOutlined, size: 40, color: AppPalette.of(context).secondaryText),
             const SizedBox(height: 16),
             Text(text,
                 textAlign: TextAlign.center,
@@ -463,7 +474,7 @@ class _InputBar extends StatelessWidget {
                 )
               : IconButton(
                   onPressed: enabled ? onSend : null,
-                  icon: const Icon(Icons.send),
+                  icon: const Icon(AppIcons.send),
                   color: AppPalette.of(context).accent,
                   disabledColor: AppPalette.of(context).secondaryText.withValues(alpha: 0.4),
                 ),

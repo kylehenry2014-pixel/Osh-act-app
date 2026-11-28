@@ -5,6 +5,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../data/bookmarks_repository.dart';
 import '../data/translations_repository.dart';
 import '../models/entry.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 /// Shows a single entry's full text, with Prev/Next buttons that page
@@ -176,7 +177,7 @@ class _DetailScreenState extends State<DetailScreen> {
       } catch (error) {
         debugPrint('Unable to read legislation aloud: $error');
 
-        if (!_speechIsCurrent(revision)) return;
+        if (!mounted || !_speechIsCurrent(revision)) return;
 
         setState(() => _isSpeaking = false);
 
@@ -400,7 +401,7 @@ class _BackBar extends StatelessWidget {
             Row(
               children: [
                 PremiumHeaderButton(
-                  icon: Icons.arrow_back_rounded,
+                  icon: AppIcons.arrowBackRounded,
                   tooltip: 'Back',
                   onPressed: onTap,
                 ),
@@ -418,8 +419,8 @@ class _BackBar extends StatelessWidget {
                 const SizedBox(width: 8),
                 PremiumHeaderButton(
                   icon: isSpeaking
-                      ? Icons.stop_circle_outlined
-                      : Icons.volume_up_rounded,
+                      ? AppIcons.stopCircleOutlined
+                      : AppIcons.volumeUpRounded,
                   tooltip: isSpeaking
                       ? 'Stop reading'
                       : 'Read aloud',
@@ -429,8 +430,8 @@ class _BackBar extends StatelessWidget {
                 const SizedBox(width: 8),
                 PremiumHeaderButton(
                   icon: bookmarked
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
+                      ? AppIcons.bookmarkRounded
+                      : AppIcons.bookmarkBorderRounded,
                   tooltip: bookmarked
                       ? 'Remove bookmark'
                       : 'Save bookmark',
@@ -494,7 +495,7 @@ class _NotesSection extends StatelessWidget {
           onTap: onToggle,
           child: Row(
             children: [
-              Icon(Icons.edit_note, size: 18, color: AppPalette.of(context).secondaryText),
+              Icon(AppIcons.editNote, size: 18, color: AppPalette.of(context).secondaryText),
               const SizedBox(width: 6),
               Text(
                 hasNote ? 'My note' : 'Add a note',

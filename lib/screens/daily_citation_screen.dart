@@ -144,7 +144,7 @@ class _DailyCitationScreenState extends State<DailyCitationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
+      appBar: const PremiumSectionAppBar(
         title: 'Daily Citation',
         titleSize: 18,
       ),

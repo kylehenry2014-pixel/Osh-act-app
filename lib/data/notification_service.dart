@@ -8,6 +8,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
 import '../models/certificate.dart';
+import 'notification_inbox_repository.dart';
+import 'notification_schedule_repository.dart';
 
 class NotificationService {
   static final NotificationService instance =
@@ -16,6 +18,60 @@ class NotificationService {
   NotificationService._();
 
   final _plugin = FlutterLocalNotificationsPlugin();
+
+  final _scheduleLedger =
+      NotificationScheduleRepository.instance;
+
+  // Notification history is secondary to platform reminders.
+  Future<void> _protectLedger(
+    Future<void> Function() operation,
+  ) async {
+    try {
+      await operation();
+    } catch (error) {
+      debugPrint(
+        'Certificate notification history unavailable: '
+        '${error.runtimeType}',
+      );
+    }
+  }
+
+  String? _pendingNotificationPayload;
+
+  String? get pendingNotificationPayload =>
+      _pendingNotificationPayload;
+
+  void clearPendingNotification(String payload) {
+    if (_pendingNotificationPayload == payload) {
+      _pendingNotificationPayload = null;
+    }
+  }
+
+  void _captureNotificationResponse(
+    NotificationResponse response,
+  ) {
+    final payload = response.payload;
+
+    if (payload == null) return;
+
+    final separator = payload.indexOf(':');
+
+    if (separator <= 0 ||
+        separator == payload.length - 1) {
+      return;
+    }
+
+    final type = payload.substring(0, separator);
+    final reference = payload.substring(separator + 1);
+
+    if (reference.trim().isEmpty ||
+        (type != 'certificate' &&
+            type != 'citation')) {
+      return;
+    }
+
+    _pendingNotificationPayload = payload;
+  }
 
   bool _initialized = false;
   Future<void>? _initializing;
@@ -83,7 +139,30 @@ class NotificationService {
         android: androidSettings,
         iOS: iosSettings,
       ),
+      onDidReceiveNotificationResponse:
+          _captureNotificationResponse,
     );
+
+    // Recover the notification that launched the app.
+    try {
+      final launchDetails =
+          await _plugin.getNotificationAppLaunchDetails();
+
+      if (launchDetails?.didNotificationLaunchApp == true) {
+        final response =
+            launchDetails?.notificationResponse;
+
+        if (response != null &&
+            _pendingNotificationPayload == null) {
+          _captureNotificationResponse(response);
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        'Notification launch details unavailable: '
+        '${error.runtimeType}',
+      );
+    }
 
     _initialized = true;
   }
@@ -254,6 +333,10 @@ class NotificationService {
   Future<void> _scheduleCertificate(
     Certificate cert,
   ) async {
+    await _protectLedger(
+      () => _scheduleLedger.reconcileDue(),
+    );
+
     final baseId = await _allocateId(cert.id);
     final now = DateTime.now();
 
@@ -292,6 +375,9 @@ class NotificationService {
       try {
         if (!fireDate.isAfter(now)) {
           await _plugin.cancel(id);
+          await _protectLedger(
+            () => _scheduleLedger.removePlatformId(id),
+          );
           continue;
         }
 
@@ -316,6 +402,27 @@ class NotificationService {
           when: when,
           exactAllowed: exactAllowed,
           payload: 'certificate:${cert.id}',
+        );
+
+        final expiryKey =
+            '${cert.expiryDate.year}-'
+            '${cert.expiryDate.month.toString().padLeft(2, '0')}-'
+            '${cert.expiryDate.day.toString().padLeft(2, '0')}';
+
+        await _protectLedger(
+          () => _scheduleLedger.record(
+            ScheduledInboxNotification(
+              platformId: id,
+              notification: InboxNotification(
+                id: 'certificate_${cert.id}_${expiryKey}_$daysBefore',
+                type: InboxNotificationType.certificateReminder,
+                title: title,
+                message: body,
+                createdAt: when.toUtc(),
+                referenceId: cert.id,
+              ),
+            ),
+          ),
         );
       } catch (error) {
         failures++;
@@ -398,13 +505,29 @@ class NotificationService {
       final map = await _readIdMap(prefs);
       final baseId = map[certId];
 
-      if (baseId == null) return;
+      await _protectLedger(
+        () => _scheduleLedger.reconcileDue(),
+      );
 
-      for (var i = 0;
-          i < _reminderDaysBefore.length;
-          i++) {
-        await _plugin.cancel(baseId + i);
+      if (baseId != null) {
+        for (var i = 0;
+            i < _reminderDaysBefore.length;
+            i++) {
+          await _plugin.cancel(baseId + i);
+          await _protectLedger(
+            () => _scheduleLedger.removePlatformId(baseId + i),
+          );
+        }
       }
+
+      await _protectLedger(
+        () => _scheduleLedger.removeReference(
+          InboxNotificationType.certificateReminder,
+          certId,
+        ),
+      );
+
+      if (baseId == null) return;
 
       map.remove(certId);
 
@@ -479,6 +602,10 @@ class NotificationService {
           .where((id) => !activeIds.contains(id))
           .toList();
 
+      await _protectLedger(
+        () => _scheduleLedger.reconcileDue(),
+      );
+
       for (final certId in staleIds) {
         final baseId = map[certId]!;
 
@@ -486,7 +613,17 @@ class NotificationService {
             i < _reminderDaysBefore.length;
             i++) {
           await _plugin.cancel(baseId + i);
+          await _protectLedger(
+            () => _scheduleLedger.removePlatformId(baseId + i),
+          );
         }
+
+        await _protectLedger(
+          () => _scheduleLedger.removeReference(
+            InboxNotificationType.certificateReminder,
+            certId,
+          ),
+        );
 
         map.remove(certId);
       }

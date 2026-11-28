@@ -8,6 +8,7 @@ import '../data/entries_repository.dart';
 import '../data/iso_repository.dart';
 import '../data/translations_repository.dart';
 import '../models/iso_clause.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import 'detail_screen.dart';
 
@@ -193,7 +194,7 @@ class _IsoScreenState extends State<IsoScreen> {
       } catch (error) {
         debugPrint('Unable to read ISO clause: $error');
 
-        if (!_speechIsCurrent(revision)) return;
+        if (!mounted || !_speechIsCurrent(revision)) return;
 
         setState(() => _isSpeaking = false);
 
@@ -318,7 +319,7 @@ class _Header extends StatelessWidget {
         child: Row(
           children: [
             PremiumHeaderButton(
-              icon: Icons.arrow_back_rounded,
+              icon: AppIcons.arrowBackRounded,
               tooltip: 'Back',
               onPressed: onBack,
             ),
@@ -350,8 +351,8 @@ class _Header extends StatelessWidget {
               const SizedBox(width: 8),
               PremiumHeaderButton(
                 icon: isSpeaking
-                    ? Icons.stop_circle_outlined
-                    : Icons.volume_up_rounded,
+                    ? AppIcons.stopCircleOutlined
+                    : AppIcons.volumeUpRounded,
                 tooltip: isSpeaking
                     ? 'Stop reading'
                     : 'Read aloud',
@@ -409,7 +410,7 @@ class _StandardsList extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward, size: 18, color: AppPalette.of(context).secondaryText),
+                Icon(AppIcons.arrowForward, size: 18, color: AppPalette.of(context).secondaryText),
               ],
             ),
           ),

@@ -5,6 +5,7 @@ import '../data/certificates_repository.dart';
 import '../data/download_allowance_service.dart';
 import '../data/notification_service.dart';
 import '../models/certificate.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 /// Add a new certificate, or edit an existing one (pass [existing] to edit).
@@ -321,7 +322,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today_outlined,
+                    Icon(AppIcons.calendarTodayOutlined,
                         size: 18, color: AppPalette.of(context).secondaryText),
                     const SizedBox(width: 10),
                     Text(
@@ -442,7 +443,7 @@ class _PagesPicker extends StatelessWidget {
                 color: AppPalette.of(context).surface,
                 border: Border.all(color: AppPalette.of(context).border)),
             child: Center(
-              child: Icon(Icons.description_outlined,
+              child: Icon(AppIcons.descriptionOutlined,
                   size: 36, color: AppPalette.of(context).secondaryText),
             ),
           )
@@ -466,7 +467,7 @@ class _PagesPicker extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: enabled ? onCamera : null,
-                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                icon: const Icon(AppIcons.cameraAltOutlined, size: 18),
                 label: Text(imagePaths.isEmpty ? 'Take Photo' : 'Add Page'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppPalette.of(context).text,
@@ -481,7 +482,7 @@ class _PagesPicker extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: enabled ? onGallery : null,
-                icon: const Icon(Icons.upload_outlined, size: 18),
+                icon: const Icon(AppIcons.uploadOutlined, size: 18),
                 label: const Text('Upload'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppPalette.of(context).text,
@@ -531,7 +532,7 @@ class _PageThumbnail extends StatelessWidget {
             height: 110,
             errorBuilder: (_, __, ___) => Center(
               child: Icon(
-                Icons.broken_image_outlined,
+                AppIcons.brokenImageOutlined,
                 color: AppPalette.of(context).secondaryText,
               ),
             ),
@@ -556,7 +557,7 @@ class _PageThumbnail extends StatelessWidget {
               padding: const EdgeInsets.all(2),
               decoration: const BoxDecoration(
                   color: AppColors.red, shape: BoxShape.circle),
-              child: const Icon(Icons.close, size: 14, color: Colors.white),
+              child: const Icon(AppIcons.close, size: 14, color: Colors.white),
             ),
           ),
         ),

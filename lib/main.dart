@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import 'data/app_rating_service.dart';
+import 'data/app_update_service.dart';
+import 'widgets/app_rating_dialog.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,14 +14,21 @@ import 'data/daily_citation_service.dart';
 import 'data/entries_repository.dart';
 import 'data/iso_repository.dart';
 import 'data/notification_service.dart';
+import 'data/notification_schedule_repository.dart';
 import 'data/saved_documents_repository.dart';
 import 'data/subscription_repository.dart';
 import 'data/toolbox_talks_repository.dart';
 import 'data/translations_repository.dart';
+import 'theme/app_icons.dart';
 import 'theme/app_theme.dart';
 import 'theme/appearance_controller.dart';
 import 'screens/explore_screen.dart';
 import 'screens/more_screen.dart';
+import 'screens/bookmarks_screen.dart';
+import 'screens/toolbox_talks_screen.dart';
+import 'screens/chat_screen.dart';
+import 'data/connectivity_service.dart';
+import 'screens/notifications_screen.dart';
 import 'widgets/ohs_splash.dart';
 
 Future<void> _initialiseOptionalService(
@@ -122,6 +133,9 @@ class OhsApp extends StatelessWidget {
 }
 
 /// Shows the animated OHS splash on top of the app, then removes it.
+final ValueNotifier<bool> _ratingSplashReady =
+    ValueNotifier<bool>(false);
+
 class _SplashGate extends StatefulWidget {
   final Widget child;
   const _SplashGate({required this.child});
@@ -150,6 +164,7 @@ class _SplashGateState extends State<_SplashGate> {
                 onFinished: () {
                   if (mounted) {
                     setState(() => _showSplash = false);
+                    _ratingSplashReady.value = true;
                   }
                 },
               ),
@@ -167,18 +182,288 @@ class RootShell extends StatefulWidget {
   State<RootShell> createState() => _RootShellState();
 }
 
-class _RootShellState extends State<RootShell> {
+class _RootShellState extends State<RootShell>
+    with WidgetsBindingObserver {
   int _tabIndex = 0;
+  bool _openingAssistantTab = false;
+  bool _assistantTabCreated = false;
   bool _loading = true;
   String? _loadError;
 
   final GlobalKey<ExploreScreenState> _homeKey =
       GlobalKey<ExploreScreenState>();
 
+  final _ratingService = AppRatingService.instance;
+
+  Timer? _ratingTimer;
+  Timer? _notificationReconcileTimer;
+  Timer? _notificationNavigationTimer;
+  bool _notificationNavigationBusy = false;
+  bool _notificationReconcileBusy = false;
+  bool _ratingCheckBusy = false;
+  int _ratingSaveTicks = 0;
+
+  bool get _ratingForeground =>
+      WidgetsBinding.instance.lifecycleState ==
+      AppLifecycleState.resumed;
+
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
     _loadData();
+    unawaited(_initialiseRating());
+    unawaited(_checkInstalledUpdate());
+
+    _startNotificationNavigation();
+
+    _startNotificationReconciliation();
+  }
+
+  void _startNotificationNavigation() {
+    _notificationNavigationTimer?.cancel();
+    _notificationNavigationTimer = null;
+
+    if (!mounted || !_ratingForeground) return;
+
+    _notificationNavigationTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => unawaited(_dispatchNotificationTap()),
+    );
+  }
+
+  Future<void> _dispatchNotificationTap() async {
+    if (!mounted ||
+        _openingAssistantTab ||
+        _notificationNavigationBusy ||
+        !_ratingSplashReady.value ||
+        !_ratingForeground ||
+        _loading ||
+        _loadError != null ||
+        _ratingCheckBusy ||
+        AdService.instance.isBusy) {
+      return;
+    }
+
+    final service = NotificationService.instance;
+    final payload = service.pendingNotificationPayload;
+
+    if (payload == null) return;
+
+    // Do not interrupt an existing route or modal.
+    final currentRoute = ModalRoute.of(context);
+
+    if (currentRoute?.isCurrent != true ||
+        !TickerMode.of(context)) {
+      return;
+    }
+
+    final animation = currentRoute?.animation;
+    final secondary = currentRoute?.secondaryAnimation;
+
+    if ((animation != null &&
+            animation.status != AnimationStatus.completed) ||
+        (secondary != null &&
+            secondary.status != AnimationStatus.dismissed)) {
+      return;
+    }
+
+    _notificationNavigationBusy = true;
+
+    try {
+      final route = MaterialPageRoute<void>(
+        builder: (_) => NotificationsScreen(
+          initialPayload: payload,
+        ),
+      );
+
+      final navigation =
+          Navigator.of(context).push<void>(route);
+
+      service.clearPendingNotification(payload);
+
+      await navigation;
+    } catch (error) {
+      debugPrint(
+        'Notification navigation unavailable: '
+        '${error.runtimeType}',
+      );
+    } finally {
+      _notificationNavigationBusy = false;
+    }
+  }
+
+  void _startNotificationReconciliation() {
+    _notificationReconcileTimer?.cancel();
+
+    if (!mounted ||
+        WidgetsBinding.instance.lifecycleState !=
+            AppLifecycleState.resumed) {
+      return;
+    }
+
+    unawaited(_reconcileNotifications());
+
+    _notificationReconcileTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => unawaited(_reconcileNotifications()),
+    );
+  }
+
+  Future<void> _reconcileNotifications() async {
+    if (!mounted ||
+        _notificationReconcileBusy ||
+        WidgetsBinding.instance.lifecycleState !=
+            AppLifecycleState.resumed) {
+      return;
+    }
+
+    _notificationReconcileBusy = true;
+
+    try {
+      await NotificationScheduleRepository.instance
+          .reconcileDue();
+    } catch (error) {
+      debugPrint(
+        'Notification reconciliation unavailable: $error',
+      );
+    } finally {
+      _notificationReconcileBusy = false;
+    }
+  }
+
+  Future<void> _checkInstalledUpdate() async {
+    try {
+      await AppUpdateService.instance.checkInstalledVersion();
+    } catch (_) {
+      debugPrint('Application update check unavailable.');
+    }
+  }
+
+  Future<void> _initialiseRating() async {
+    try {
+      await _ratingService.init();
+
+      if (!mounted) return;
+
+      _ratingTimer = Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => unawaited(_checkRatingPrompt()),
+      );
+    } catch (_) {
+      debugPrint('App rating service unavailable.');
+    }
+  }
+
+  Future<void> _pauseRatingUsage() async {
+    try {
+      await _ratingService.pauseUsage();
+    } catch (_) {
+      debugPrint('App rating usage could not be saved.');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(
+    AppLifecycleState state,
+  ) {
+    if (state != AppLifecycleState.resumed) {
+      unawaited(_pauseRatingUsage());
+
+      _notificationReconcileTimer?.cancel();
+      _notificationReconcileTimer = null;
+
+      _notificationNavigationTimer?.cancel();
+      _notificationNavigationTimer = null;
+    } else {
+      _startNotificationReconciliation();
+      _startNotificationNavigation();
+    }
+  }
+
+  Future<void> _checkRatingPrompt() async {
+    if (!mounted || _ratingCheckBusy) return;
+
+    _ratingCheckBusy = true;
+
+    try {
+      if (!_ratingSplashReady.value ||
+          !_ratingForeground ||
+          _loading ||
+          _loadError != null ||
+          AdService.instance.isBusy) {
+        await _pauseRatingUsage();
+        return;
+      }
+
+      if (_ratingService.automaticPromptDisabled) {
+        _ratingTimer?.cancel();
+        await _pauseRatingUsage();
+        return;
+      }
+
+      _ratingService.resumeUsage();
+
+      _ratingSaveTicks++;
+
+      if (_ratingSaveTicks >= 15) {
+        _ratingSaveTicks = 0;
+        await _ratingService.saveUsage();
+      }
+
+      if (!mounted ||
+          !_ratingSplashReady.value ||
+          !_ratingForeground ||
+          _loading ||
+          _loadError != null ||
+          !_ratingService.shouldPrompt ||
+          _openingAssistantTab ||
+        _notificationNavigationBusy ||
+          NotificationService.instance
+                  .pendingNotificationPayload != null ||
+          AdService.instance.isBusy ||
+          _tabIndex != 0 ||
+          ModalRoute.of(context)?.isCurrent != true ||
+          _homeKey.currentState?.canShowRatingPrompt != true) {
+        return;
+      }
+
+      if (!_ratingService.beginPrompt()) return;
+
+      try {
+        final action = await AppRatingDialog.show(context);
+
+        if (action == null) {
+          await _ratingService.remindLater();
+        }
+      } finally {
+        _ratingService.endPrompt();
+      }
+    } catch (_) {
+      debugPrint('App rating prompt unavailable.');
+
+      // Avoid repeatedly opening a prompt when
+      // storage or presentation fails.
+      _ratingTimer?.cancel();
+      await _pauseRatingUsage();
+    } finally {
+      _ratingCheckBusy = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ratingTimer?.cancel();
+    _notificationReconcileTimer?.cancel();
+    _notificationNavigationTimer?.cancel();
+
+    WidgetsBinding.instance.removeObserver(this);
+
+    unawaited(_pauseRatingUsage());
+
+    super.dispose();
   }
 
   bool _loadInProgress = false;
@@ -300,7 +585,133 @@ class _RootShellState extends State<RootShell> {
     }
   }
 
+  static const _chatFeatureKey = 'chat';
+
+  bool _canContinueFeatureOpen() {
+    return mounted &&
+        _ratingForeground &&
+        ModalRoute.of(context)?.isCurrent == true &&
+        TickerMode.of(context);
+  }
+
+  void _activateAssistantTab() {
+    if (!_canContinueFeatureOpen()) return;
+
+    setState(() {
+      _assistantTabCreated = true;
+      _tabIndex = 3;
+    });
+  }
+
+  Future<bool?> _confirmWatchAds(int adCount, String actionLabel) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Watch an ad to continue'),
+        content: Text(
+          adCount == 1
+              ? 'Watch a short ad to $actionLabel.'
+              : 'Watch $adCount ads back-to-back to $actionLabel.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Watch'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _checkOnlineOrWarn(String actionLabel) async {
+    final online = await ConnectivityService.instance.isOnline();
+    if (!online && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('You need an internet connection to $actionLabel.')),
+      );
+    }
+    return online;
+  }
+
+  Future<void> _openChat() async {
+    if (_openingAssistantTab ||
+        !_canContinueFeatureOpen()) {
+      return;
+    }
+
+    _openingAssistantTab = true;
+
+    try {
+      await _openChatInternal();
+    } catch (error) {
+      debugPrint(
+        'AI Assistant opening failed: ${error.runtimeType}',
+      );
+
+      if (mounted && _canContinueFeatureOpen()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to open AI Assistant. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _openingAssistantTab = false;
+    }
+  }
+
+  Future<void> _openChatInternal() async {
+    if (!await _checkOnlineOrWarn('use the Safety Chat Bot')) return;
+    if (!mounted || !_canContinueFeatureOpen()) return;
+    if (SubscriptionRepository.instance.isPro) {
+      _activateAssistantTab();
+      return;
+    }
+    final adCount =
+        await AdService.instance.nextRequiredAdCount(_chatFeatureKey);
+    if (!mounted || !_canContinueFeatureOpen()) return;
+    final confirmed = await _confirmWatchAds(adCount, 'ask a question');
+    if (!mounted || confirmed != true || !_canContinueFeatureOpen()) return;
+
+    final earned = await AdService.instance.watchAds(adCount);
+    if (!mounted || !_canContinueFeatureOpen()) return;
+
+    if (!earned) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            adCount == 1
+                ? "You'll need to watch the ad through to the end to unlock this."
+                : "You'll need to watch all $adCount ads through to the end to unlock this.",
+          ),
+        ),
+      );
+      return;
+    }
+    await AdService.instance.recordUnlockedRequest(_chatFeatureKey);
+    if (!mounted || !_canContinueFeatureOpen()) return;
+
+    _activateAssistantTab();
+  }
+
   void _onTabTapped(int index) {
+    if (_openingAssistantTab || AdService.instance.isBusy) {
+      return;
+    }
+
+    if (index == 3 && index != _tabIndex) {
+      HapticFeedback.selectionClick();
+      FocusManager.instance.primaryFocus?.unfocus();
+      unawaited(_openChat());
+      return;
+    }
     if (index == _tabIndex) {
       if (index == 0) {
         _homeKey.currentState?.resetToTop();
@@ -333,7 +744,7 @@ class _RootShellState extends State<RootShell> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.warning_amber_rounded,
+                  AppIcons.warningAmberRounded,
                   size: 48,
                   color: AppPalette.of(context).accent,
                 ),
@@ -346,7 +757,7 @@ class _RootShellState extends State<RootShell> {
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   onPressed: _loadInProgress ? null : _loadData,
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const Icon(AppIcons.refreshRounded),
                   label: const Text('Try Again'),
                 ),
               ],
@@ -358,13 +769,19 @@ class _RootShellState extends State<RootShell> {
 
     final tabs = [
       ExploreScreen(key: _homeKey, autoFocusSearch: false),
+      const BookmarksScreen(embedded: true),
+      const ToolboxTalksScreen(embedded: true),
+      if (_assistantTabCreated)
+        const ChatScreen(embedded: true)
+      else
+        const SizedBox.shrink(),
       const MoreScreen(),
     ];
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
+        if (didPop || _openingAssistantTab) return;
         if (_tabIndex == 0) {
           final handledInHome = _homeKey.currentState?.handleBack() ?? false;
           if (handledInHome) return;
@@ -567,7 +984,7 @@ class _BottomNav extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final tabWidth = constraints.maxWidth / 2;
+                final tabWidth = constraints.maxWidth / 5;
 
                 return Stack(
                   children: [
@@ -584,7 +1001,7 @@ class _BottomNav extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _PremiumNavTab(
-                            icon: Icons.home_outlined,
+                            icon: AppIcons.homeOutlined,
                             label: 'Home',
                             active: currentIndex == 0,
                             onTap: () => onTap(0),
@@ -592,10 +1009,34 @@ class _BottomNav extends StatelessWidget {
                         ),
                         Expanded(
                           child: _PremiumNavTab(
-                            icon: Icons.grid_view_rounded,
-                            label: 'More',
+                            icon: AppIcons.bookmarkBorderRounded,
+                            label: 'Bookmarks',
                             active: currentIndex == 1,
                             onTap: () => onTap(1),
+                          ),
+                        ),
+                        Expanded(
+                          child: _PremiumNavTab(
+                            icon: AppIcons.assignmentIndOutlined,
+                            label: 'Toolbox Talks',
+                            active: currentIndex == 2,
+                            onTap: () => onTap(2),
+                          ),
+                        ),
+                        Expanded(
+                          child: _PremiumNavTab(
+                            icon: AppIcons.chatBubbleOutline,
+                            label: 'AI Assistant',
+                            active: currentIndex == 3,
+                            onTap: () => onTap(3),
+                          ),
+                        ),
+                        Expanded(
+                          child: _PremiumNavTab(
+                            icon: AppIcons.gridViewRounded,
+                            label: 'More',
+                            active: currentIndex == 4,
+                            onTap: () => onTap(4),
                           ),
                         ),
                       ],
@@ -756,7 +1197,8 @@ class _PremiumNavTab extends StatelessWidget {
                   ),
                   child: Text(
                     label,
-                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

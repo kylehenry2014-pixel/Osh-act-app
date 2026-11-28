@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_icons.dart';
 import '../theme/appearance_controller.dart';
 
 class AppearanceSelector extends StatelessWidget {
@@ -55,7 +56,7 @@ class AppearanceSelector extends StatelessWidget {
               const Row(
                 children: [
                   Icon(
-                    Icons.palette_outlined,
+                    AppIcons.paletteOutlined,
                     color: Color(0xFFFFE4A0),
                     size: 28,
                   ),
@@ -92,7 +93,7 @@ class AppearanceSelector extends StatelessWidget {
                 mode: ThemeMode.light,
                 selected: appearance.mode,
                 enabled: enabled,
-                icon: Icons.light_mode_outlined,
+                icon: AppIcons.lightModeOutlined,
                 title: 'Light',
                 subtitle: 'Classic cream and gold',
               ),
@@ -102,19 +103,9 @@ class AppearanceSelector extends StatelessWidget {
                 mode: ThemeMode.dark,
                 selected: appearance.mode,
                 enabled: enabled,
-                icon: Icons.dark_mode_outlined,
+                icon: AppIcons.darkModeOutlined,
                 title: 'Dark',
                 subtitle: 'Premium charcoal and gold',
-              ),
-              const SizedBox(height: 8),
-              _option(
-                context,
-                mode: ThemeMode.system,
-                selected: appearance.mode,
-                enabled: enabled,
-                icon: Icons.smartphone_outlined,
-                title: 'System',
-                subtitle: 'Follow device settings',
               ),
               const SizedBox(height: 12),
               Text(
@@ -203,8 +194,8 @@ class AppearanceSelector extends StatelessWidget {
                 ),
                 Icon(
                   active
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked,
+                      ? AppIcons.checkCircle
+                      : AppIcons.radioButtonUnchecked,
                   color: active
                       ? const Color(0xFFDA9B2A)
                       : const Color(0xFF85897D),

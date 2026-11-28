@@ -8,9 +8,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import '../data/ad_service.dart';
 import '../data/connectivity_service.dart';
+import '../data/document_integrity.dart';
 import '../data/download_allowance_service.dart';
 import '../data/sds_repository.dart';
 import '../data/subscription_repository.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_download_button.dart';
 
@@ -306,13 +308,7 @@ class _SdsScreenState extends State<SdsScreen> {
   }
 
   bool _isPdf(List<int> bytes) {
-    // PDF signature: %PDF-
-    return bytes.length >= 5 &&
-        bytes[0] == 0x25 &&
-        bytes[1] == 0x50 &&
-        bytes[2] == 0x44 &&
-        bytes[3] == 0x46 &&
-        bytes[4] == 0x2D;
+    return DocumentIntegrity.matchesHeader(bytes, 'pdf');
   }
 
   Future<void> _saveSds() async {
@@ -390,6 +386,11 @@ class _SdsScreenState extends State<SdsScreen> {
       if (await tempFile.length() != response.bodyBytes.length) {
         throw StateError('The prepared PDF is incomplete.');
       }
+
+      await DocumentIntegrity.validateFile(
+        tempFile,
+        expectedExtension: 'pdf',
+      );
 
       if (!mounted ||
           ModalRoute.of(context)?.isCurrent != true) {
@@ -488,7 +489,7 @@ class _SdsScreenState extends State<SdsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppPalette.of(context).background,
-      appBar: PremiumSectionAppBar(
+      appBar: const PremiumSectionAppBar(
         title: 'SDS Finder',
         titleSize: 20,
       ),
@@ -535,7 +536,7 @@ class _SdsScreenState extends State<SdsScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   onPressed: _busy ? null : _searchByPhoto,
-                  icon: const Icon(Icons.camera_alt_outlined),
+                  icon: const Icon(AppIcons.cameraAltOutlined),
                   color: AppPalette.of(context).accent,
                   tooltip: 'Photograph the label',
                 ),
@@ -576,8 +577,8 @@ class _SdsScreenState extends State<SdsScreen> {
                   children: [
                     Icon(
                       _errorIsQuota
-                          ? Icons.hourglass_bottom
-                          : Icons.error_outline,
+                          ? AppIcons.hourglassBottom
+                          : AppIcons.errorOutline,
                       size: 16,
                       color:
                           _errorIsQuota ? AppPalette.of(context).accent : AppPalette.of(context).error,
@@ -655,7 +656,7 @@ class _SdsScreenState extends State<SdsScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: _busy ? null : _openInBrowser,
-                icon: const Icon(Icons.open_in_new, size: 18),
+                icon: const Icon(AppIcons.openInNew, size: 18),
                 label: const Text('Open SDS in browser'),
               ),
             ),

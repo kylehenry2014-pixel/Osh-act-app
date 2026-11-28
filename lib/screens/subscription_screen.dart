@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../data/subscription_repository.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 class SubscriptionScreen extends StatefulWidget {
@@ -193,27 +194,37 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const _BenefitCard(
-                          icon: Icons.verified_user_outlined,
+                          icon: AppIcons.verifiedUserOutlined,
                           title: 'Ad-free experience',
                           subtitle: 'Work without advertising interruptions.',
                         ),
                         const SizedBox(height: 10),
                         const _BenefitCard(
-                          icon: Icons.chat_bubble_outline,
+                          icon: AppIcons.chatBubbleOutline,
                           title: 'Safety Chat Bot',
                           subtitle: '20 uses per day.',
                         ),
                         const SizedBox(height: 10),
                         const _BenefitCard(
-                          icon: Icons.science_outlined,
+                          icon: AppIcons.scienceOutlined,
                           title: 'SDS Finder',
                           subtitle: '20 uses per day.',
                         ),
                         const SizedBox(height: 10),
                         const _BenefitCard(
-                          icon: Icons.folder_copy_outlined,
+                          icon: AppIcons.folderCopyOutlined,
                           title: 'Documents & Certificates',
                           subtitle: '20 saves per day.',
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'and more',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFDA9B2A),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 24),
 
@@ -253,7 +264,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Icon(
-                                  Icons.info_outline,
+                                  AppIcons.infoOutline,
                                   size: 20,
                                   color: AppPalette.of(context).accent,
                                 ),
@@ -326,7 +337,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               _purchasing || _restoreRequestInFlight
                                   ? null
                                   : _restore,
-                          icon: const Icon(Icons.restore, size: 21),
+                          icon: const Icon(AppIcons.restore, size: 21),
                           label: const Text('Restore Purchases'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppPalette.of(context).text,
@@ -372,7 +383,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
 class _PremiumColors {
   static const ink = Color(0xFF171916);
-  static const charcoal = Color(0xFF30332E);
   static const gold = Color(0xFFDA9B2A);
   static const lightGold = Color(0xFFFFE4A0);
   static const bronze = Color(0xFF95621C);
@@ -421,11 +431,9 @@ class _PremiumColors {
 
 class _MetallicPanel extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
 
   const _MetallicPanel({
     required this.child,
-    this.padding = const EdgeInsets.all(18),
   });
 
   @override
@@ -444,7 +452,7 @@ class _MetallicPanel extends StatelessWidget {
         ],
       ),
       child: Container(
-        padding: padding,
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: _PremiumColors.darkGradient,
           borderRadius: BorderRadius.circular(20),
@@ -611,7 +619,7 @@ class _PremiumHeader extends StatelessWidget {
                       shaderCallback: (bounds) =>
                           _PremiumColors.goldGradient.createShader(bounds),
                       child: const Icon(
-                        Icons.workspace_premium,
+                        AppIcons.workspacePremium,
                         size: 54,
                         color: Colors.white,
                       ),
@@ -808,7 +816,7 @@ class _BenefitCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Icon(
-              Icons.check_rounded,
+              AppIcons.checkRounded,
               color: Theme.of(context).brightness == Brightness.dark
                   ? _PremiumColors.lightGold
                   : _PremiumColors.bronze,
@@ -880,7 +888,7 @@ class _GoldButton extends StatelessWidget {
                     ),
                   ),
                   const Icon(
-                    Icons.chevron_right,
+                    AppIcons.chevronRight,
                     color: _PremiumColors.ink,
                   ),
                 ],
@@ -917,7 +925,7 @@ class _PlanCard extends StatelessWidget {
           Row(
             children: [
               const Icon(
-                Icons.workspace_premium,
+                AppIcons.workspacePremium,
                 color: _PremiumColors.gold,
                 size: 42,
               ),
@@ -947,7 +955,7 @@ class _PlanCard extends StatelessWidget {
                 ),
               ),
               const Icon(
-                Icons.shop_outlined,
+                AppIcons.shopOutlined,
                 color: _PremiumColors.lightGold,
                 size: 26,
               ),
@@ -983,7 +991,7 @@ class _PlanCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.lock_outline,
+                AppIcons.lockOutline,
                 size: 14,
                 color: Color(0xFFD6D2C5),
               ),
@@ -1064,7 +1072,7 @@ class _BillingUnavailable extends StatelessWidget {
       child: Column(
         children: [
           const Icon(
-            Icons.cloud_off_outlined,
+            AppIcons.cloudOffOutlined,
             color: _PremiumColors.gold,
             size: 36,
           ),
@@ -1111,7 +1119,7 @@ class _ActiveMembership extends StatelessWidget {
       child: Column(
         children: [
           Icon(
-            Icons.verified,
+            AppIcons.verified,
             color: _PremiumColors.gold,
             size: 52,
           ),

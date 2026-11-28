@@ -4,11 +4,17 @@ import '../data/legislation_access_service.dart';
 import '../data/bookmarks_repository.dart';
 import '../data/entries_repository.dart';
 import '../models/entry.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import 'detail_screen.dart';
 
 class BookmarksScreen extends StatefulWidget {
-  const BookmarksScreen({super.key});
+  final bool embedded;
+
+  const BookmarksScreen({
+    super.key,
+    this.embedded = false,
+  });
 
   @override
   State<BookmarksScreen> createState() => _BookmarksScreenState();
@@ -56,12 +62,14 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
-                    PremiumHeaderButton(
-                      icon: Icons.arrow_back_rounded,
-                      tooltip: 'Back',
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 12),
+                    if (!widget.embedded) ...[
+                      PremiumHeaderButton(
+                        icon: AppIcons.arrowBackRounded,
+                        tooltip: 'Back',
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,7 +138,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                     ],
                                   ),
                                 ),
-                                Icon(Icons.bookmark, size: 18, color: AppPalette.of(context).accent),
+                                Icon(AppIcons.bookmark, size: 18, color: AppPalette.of(context).accent),
                               ],
                             ),
                           ),

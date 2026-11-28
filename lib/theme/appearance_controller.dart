@@ -32,7 +32,8 @@ class AppearanceController extends ChangeNotifier {
           _mode = ThemeMode.dark;
           break;
         case 'system':
-          _mode = ThemeMode.system;
+          _mode = ThemeMode.light;
+          await prefs.setString(_preferenceKey, 'light');
           break;
         default:
           _mode = ThemeMode.light;
@@ -47,6 +48,9 @@ class AppearanceController extends ChangeNotifier {
   }
 
   Future<bool> setMode(ThemeMode mode) async {
+    if (mode != ThemeMode.light && mode != ThemeMode.dark) {
+      return false;
+    }
     if (!_loaded || _saving) return false;
     if (_mode == mode) return true;
 
